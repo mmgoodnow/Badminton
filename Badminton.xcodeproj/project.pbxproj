@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		462268F4F226E11F6B40F8D7 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 42E8FA4102AF1AE8E953C34F /* Kingfisher */; };
+		5631FE0487C24AF6884C6207 /* Zoomable in Frameworks */ = {isa = PBXBuildFile; productRef = 3B192A3470AC49C7AF679170 /* Zoomable */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +73,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				462268F4F226E11F6B40F8D7 /* Kingfisher in Frameworks */,
+				5631FE0487C24AF6884C6207 /* Zoomable in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -135,6 +137,7 @@
 			name = Badminton;
 			packageProductDependencies = (
 				42E8FA4102AF1AE8E953C34F /* Kingfisher */,
+				3B192A3470AC49C7AF679170 /* Zoomable */,
 			);
 			productName = Badminton;
 			productReference = 51ED579A2F2C9DF700321B63 /* Badminton.app */;
@@ -220,6 +223,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3D1082C97761FDF9109CD32C /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				21422AF02CDF4229A4DB43FB /* XCRemoteSwiftPackageReference "Zoomable" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 51ED579B2F2C9DF700321B63 /* Products */;
@@ -657,6 +661,14 @@
 				minimumVersion = 7.0.0;
 			};
 		};
+		21422AF02CDF4229A4DB43FB /* XCRemoteSwiftPackageReference "Zoomable" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ryohey/Zoomable.git";
+			requirement = {
+				kind = branch;
+				branch = main;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -664,6 +676,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3D1082C97761FDF9109CD32C /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		3B192A3470AC49C7AF679170 /* Zoomable */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 21422AF02CDF4229A4DB43FB /* XCRemoteSwiftPackageReference "Zoomable" */;
+			productName = Zoomable;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

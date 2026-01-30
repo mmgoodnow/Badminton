@@ -1,5 +1,6 @@
 import Kingfisher
 import SwiftUI
+import Zoomable
 
 #if os(macOS)
 import AppKit
@@ -32,6 +33,8 @@ struct ImageLightboxView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
                 .ignoresSafeArea()
+                .zoomable(outOfBoundsColor: .black)
+                .simultaneousGesture(TapGesture().onEnded { close() })
         }
         .contentShape(Rectangle())
         .onTapGesture {
