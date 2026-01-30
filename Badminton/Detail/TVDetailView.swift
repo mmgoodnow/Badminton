@@ -129,7 +129,6 @@ struct TVDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Info")
                 .font(.headline)
-            infoRow(label: "Seasons", value: String(detail.numberOfSeasons))
             infoRow(label: "Episodes", value: String(detail.numberOfEpisodes))
             infoRow(label: "Status", value: detail.status ?? "")
             if let lastAir = TMDBDateFormatter.format(detail.lastAirDate) {
@@ -148,8 +147,9 @@ struct TVDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
+                let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(detail.seasons, id: \.id) { season in
+                    ForEach(seasons, id: \.id) { season in
                         NavigationLink {
                             TVSeasonDetailView(
                                 tvID: tvID,
@@ -212,14 +212,16 @@ struct TVDetailView: View {
                             )
                         }
 
-                        if let nextEpisode = detail.nextEpisodeToAir {
+                        if let nextEpisode = detail.nextEpisodeToAir,
+                           let stillPath = nextEpisode.stillPath,
+                           !stillPath.isEmpty {
                             EpisodeCard(
                                 title: "Up next: \(nextEpisode.name)",
                                 subtitle: episodeSubtitle(nextEpisode),
                                 overview: nextEpisode.overview,
-                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath),
+                                imageURL: viewModel.stillURL(path: stillPath),
                                 onImageTap: {
-                                    if let url = viewModel.stillURL(path: nextEpisode.stillPath) {
+                                    if let url = viewModel.stillURL(path: stillPath) {
                                         showLightbox(url: url, title: nextEpisode.name)
                                     }
                                 }
