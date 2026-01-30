@@ -177,6 +177,24 @@ struct TVDetailView: View {
 
     @ViewBuilder
     private func latestEpisodeSection(detail: TMDBTVSeriesDetail) -> some View {
+        if let nextEpisode = detail.nextEpisodeToAir {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Up next")
+                    .font(.headline)
+                Text(nextEpisode.name)
+                    .font(.subheadline.weight(.semibold))
+                Text(episodeSubtitle(nextEpisode))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let overview = nextEpisode.overview, !overview.isEmpty {
+                    Text(overview)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+            }
+        }
+
         if !viewModel.latestEpisodes.isEmpty || detail.lastEpisodeToAir != nil {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Latest episodes")
@@ -207,21 +225,6 @@ struct TVDetailView: View {
                                 onImageTap: {
                                     if let url = viewModel.stillURL(path: lastEpisode.stillPath) {
                                         showLightbox(url: url, title: lastEpisode.name)
-                                    }
-                                }
-                            )
-                        }
-
-                        if let nextEpisode = detail.nextEpisodeToAir,
-                           !viewModel.isFutureEpisode(nextEpisode.airDate) {
-                            EpisodeCard(
-                                title: "Up next: \(nextEpisode.name)",
-                                subtitle: episodeSubtitle(nextEpisode),
-                                overview: nextEpisode.overview,
-                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath),
-                                onImageTap: {
-                                    if let url = viewModel.stillURL(path: nextEpisode.stillPath) {
-                                        showLightbox(url: url, title: nextEpisode.name)
                                     }
                                 }
                             )
