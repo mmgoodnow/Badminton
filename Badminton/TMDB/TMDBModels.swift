@@ -176,6 +176,26 @@ struct TMDBEpisode: Decodable, Identifiable, Hashable {
     let runtime: Int?
 }
 
+struct TMDBEpisodeDetail: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+    let airDate: String?
+    let overview: String?
+    let stillPath: String?
+    let voteAverage: Double?
+    let voteCount: Int?
+    let runtime: Int?
+}
+
+struct TMDBEpisodeCredits: Decodable, Hashable {
+    let id: Int
+    let cast: [TMDBCastMember]
+    let crew: [TMDBCrewMember]
+    let guestStars: [TMDBCastMember]?
+}
+
 struct TMDBPersonDetail: Decodable, Identifiable, Hashable {
     let id: Int
     let name: String

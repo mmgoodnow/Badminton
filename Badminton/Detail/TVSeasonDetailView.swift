@@ -10,6 +10,7 @@ struct TVSeasonDetailView: View {
 
     @StateObject private var viewModel: TVSeasonDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
+    @State private var selectedEpisode: EpisodeRoute?
 
     init(tvID: Int, seasonNumber: Int, seasonName: String, posterPath: String? = nil) {
         self.tvID = tvID
@@ -59,6 +60,16 @@ struct TVSeasonDetailView: View {
                                         }
                                     }
                                 )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedEpisode = EpisodeRoute(
+                                        tvID: tvID,
+                                        seasonNumber: seasonNumber,
+                                        episodeNumber: episode.episodeNumber,
+                                        title: episode.name,
+                                        stillPath: episode.stillPath
+                                    )
+                                }
                             }
                         }
                     }
@@ -72,6 +83,15 @@ struct TVSeasonDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .imageLightbox(item: $lightboxItem)
+        .navigationDestination(item: $selectedEpisode) { route in
+            EpisodeDetailView(
+                tvID: route.tvID,
+                seasonNumber: route.seasonNumber,
+                episodeNumber: route.episodeNumber,
+                title: route.title,
+                stillPath: route.stillPath
+            )
+        }
         .task {
             await viewModel.load()
         }
@@ -119,6 +139,18 @@ struct TVSeasonDetailView: View {
 
     private func showLightbox(url: URL, title: String) {
         lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
+}
+
+private struct EpisodeRoute: Identifiable, Hashable {
+    let tvID: Int
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let title: String
+    let stillPath: String?
+
+    var id: String {
+        "\(tvID)-\(seasonNumber)-\(episodeNumber)"
     }
 }
 
