@@ -35,6 +35,7 @@ struct MovieDetailView: View {
                 } else if let detail = viewModel.detail {
                     overviewSection(detail: detail)
                     infoSection(detail: detail)
+                    trailersSection
                     castSection
                 }
             }
@@ -122,6 +123,31 @@ struct MovieDetailView: View {
             Text(detail.overview)
                 .font(.body)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var trailersSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !viewModel.trailers.isEmpty {
+                Text("Trailers")
+                    .font(.headline)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(viewModel.trailers) { trailer in
+                        if let url = viewModel.videoURL(for: trailer) {
+                            Link(destination: url) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "play.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                    Text(trailer.name)
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -232,6 +258,7 @@ private struct CastRow: View {
 final class MovieDetailViewModel: ObservableObject {
     @Published var detail: TMDBMovieDetail?
     @Published var credits: TMDBCredits?
+    @Published private(set) var trailers: [TMDBVideo] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -274,11 +301,13 @@ final class MovieDetailViewModel: ObservableObject {
             async let config = client.getImageConfiguration()
             async let detail: TMDBMovieDetail = client.getV3(path: "/3/movie/\(movieID)")
             async let credits: TMDBCredits = client.getV3(path: "/3/movie/\(movieID)/credits")
+            async let videos: TMDBVideoList = client.getV3(path: "/3/movie/\(movieID)/videos")
 
-            let (configResponse, detailResponse, creditsResponse) = try await (config, detail, credits)
+            let (configResponse, detailResponse, creditsResponse, videosResponse) = try await (config, detail, credits, videos)
             imageConfig = configResponse.images
             self.detail = detailResponse
             self.credits = creditsResponse
+            trailers = videosResponse.results.filter { $0.type == "Trailer" }
             hasLoaded = true
         } catch {
             errorMessage = error.localizedDescription
@@ -293,6 +322,13 @@ final class MovieDetailViewModel: ObservableObject {
 
     func profileURL(path: String?) -> URL? {
         imageURL(path: path, sizes: imageConfig?.profileSizes, fallback: "w185")
+    }
+
+    func videoURL(for video: TMDBVideo) -> URL? {
+        if video.site.lowercased() == "youtube" {
+            return URL(string: "https://www.youtube.com/watch?v=\(video.key)")
+        }
+        return nil
     }
 
     private func imageURL(path: String?, sizes: [String]?, fallback: String) -> URL? {

@@ -274,3 +274,18 @@ struct TMDBImageConfigValues: Decodable, Hashable {
     let profileSizes: [String]
     let stillSizes: [String]?
 }
+
+struct TMDBVideoList: Decodable, Hashable {
+    let id: Int
+    let results: [TMDBVideo]
+}
+
+struct TMDBVideo: Decodable, Identifiable, Hashable {
+    let id: String
+    let key: String
+    let name: String
+    let site: String
+    let type: String
+    let official: Bool?
+    let publishedAt: String?
+}
