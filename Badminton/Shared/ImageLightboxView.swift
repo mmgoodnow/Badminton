@@ -17,24 +17,24 @@ struct ImageLightboxView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1
     @State private var lastScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
 
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            KFImage(item.url)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .scaleEffect(scale)
-                .offset(offset)
+            GeometryReader { proxy in
+                ScrollView([.horizontal, .vertical], showsIndicators: false) {
+                    KFImage(item.url)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width * scale,
+                               height: proxy.size.height * scale)
+                        .clipped()
+                }
                 .gesture(magnificationGesture)
-                .simultaneousGesture(dragGesture)
-                .ignoresSafeArea()
+            }
+            .ignoresSafeArea()
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -55,27 +55,6 @@ struct ImageLightboxView: View {
             }
             .onEnded { _ in
                 lastScale = scale
-                if scale <= 1 {
-                    offset = .zero
-                    lastOffset = .zero
-                }
-            }
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                guard scale > 1 else { return }
-                offset = CGSize(width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height)
-            }
-            .onEnded { _ in
-                if scale <= 1 {
-                    offset = .zero
-                    lastOffset = .zero
-                } else {
-                    lastOffset = offset
-                }
             }
     }
 }
