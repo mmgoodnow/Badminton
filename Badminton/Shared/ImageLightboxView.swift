@@ -28,6 +28,9 @@ struct ImageLightboxView: View {
                     close()
                 }
 
+#if os(macOS)
+            ZoomableImageView(url: item.url)
+#else
             GeometryReader { proxy in
                 ScrollView([.horizontal, .vertical], showsIndicators: false) {
                     KFImage(item.url)
@@ -42,6 +45,7 @@ struct ImageLightboxView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
+#endif
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -60,6 +64,7 @@ struct ImageLightboxView: View {
         dismiss()
     }
 
+#if !os(macOS)
     private var magnificationGesture: some Gesture {
         MagnificationGesture()
             .onChanged { value in
@@ -69,6 +74,7 @@ struct ImageLightboxView: View {
                 lastScale = scale
             }
     }
+#endif
 }
 
 extension View {
@@ -120,6 +126,60 @@ private final class KeyCatcherView: NSView {
 
     override func keyDown(with event: NSEvent) {
         onKey?()
+    }
+}
+
+private struct ZoomableImageView: NSViewRepresentable {
+    let url: URL
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.hasVerticalScroller = false
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.allowsMagnification = true
+        scrollView.minMagnification = 1
+        scrollView.maxMagnification = 6
+        scrollView.magnification = 1
+
+        let hostingView = NSHostingView(rootView: AnyView(imageView))
+        hostingView.frame = scrollView.contentView.bounds
+        scrollView.documentView = hostingView
+
+        context.coordinator.hostingView = hostingView
+        context.coordinator.currentURL = url
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        if context.coordinator.currentURL != url {
+            context.coordinator.currentURL = url
+            context.coordinator.hostingView?.rootView = AnyView(imageView)
+        }
+        if let hostingView = context.coordinator.hostingView {
+            let size = nsView.contentView.bounds.size
+            if hostingView.frame.size != size {
+                hostingView.frame = NSRect(origin: .zero, size: size)
+            }
+        }
+    }
+
+    private var imageView: some View {
+        KFImage(url)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+    }
+
+    final class Coordinator {
+        var hostingView: NSHostingView<AnyView>?
+        var currentURL: URL?
     }
 }
 #endif
