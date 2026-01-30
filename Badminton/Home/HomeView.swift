@@ -32,6 +32,7 @@ struct HomeView: View {
                 }
                 .padding()
             }
+            .navigationTitle("Home")
             .searchable(text: $searchModel.query, placement: .toolbar, prompt: "Movies, TV, people")
             .navigationDestination(for: TMDBSearchResultItem.self) { item in
                 switch item.mediaType {
