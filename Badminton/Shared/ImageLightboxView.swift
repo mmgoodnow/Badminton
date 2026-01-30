@@ -6,7 +6,7 @@ import Zoomable
 import AppKit
 #endif
 
-struct ImageLightboxItem: Identifiable {
+struct ImageLightboxItem: Identifiable, Hashable {
     let id = UUID()
     let url: URL
     let title: String
@@ -59,12 +59,8 @@ extension View {
     @ViewBuilder
     func imageLightbox(item: Binding<ImageLightboxItem?>) -> some View {
 #if os(macOS)
-        overlay {
-            if let value = item.wrappedValue {
-                ImageLightboxView(item: value, onDismiss: { item.wrappedValue = nil })
-                    .transition(.opacity)
-                    .zIndex(999)
-            }
+        navigationDestination(item: item) { value in
+            ImageLightboxView(item: value, onDismiss: { item.wrappedValue = nil })
         }
 #else
         sheet(item: item) { value in
