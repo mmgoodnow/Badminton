@@ -23,6 +23,10 @@ struct ImageLightboxView: View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    close()
+                }
 
             GeometryReader { proxy in
                 ScrollView([.horizontal, .vertical], showsIndicators: false) {
@@ -38,10 +42,6 @@ struct ImageLightboxView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            close()
         }
         .onExitCommand {
             close()
