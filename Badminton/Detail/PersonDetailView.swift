@@ -46,6 +46,18 @@ struct PersonDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .navigationDestination(for: TMDBMediaCredit.self) { credit in
+            switch credit.mediaType {
+            case .movie:
+                MovieDetailView(movieID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+            case .tv:
+                TVDetailView(tvID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+            case .person, .unknown:
+                Text("Details coming soon.")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            }
+        }
         .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss { dismiss() }
         .task {
@@ -134,7 +146,7 @@ struct PersonDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(viewModel.knownFor) { credit in
-                            CreditCardView(
+                            let card = CreditCardView(
                                 title: credit.displayTitle,
                                 subtitle: viewModel.creditSubtitle(credit),
                                 imageURL: viewModel.posterURL(path: credit.posterPath),
@@ -144,6 +156,14 @@ struct PersonDetailView: View {
                                     }
                                 }
                             )
+                            if credit.mediaType == .movie || credit.mediaType == .tv {
+                                NavigationLink(value: credit) {
+                                    card
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                card
+                            }
                         }
                     }
                 }
@@ -163,7 +183,7 @@ struct PersonDetailView: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(viewModel.credits) { credit in
-                        CreditRowView(
+                        let row = CreditRowView(
                             title: credit.displayTitle,
                             subtitle: viewModel.creditSubtitle(credit),
                             imageURL: viewModel.posterURL(path: credit.posterPath),
@@ -173,6 +193,14 @@ struct PersonDetailView: View {
                                 }
                             }
                         )
+                        if credit.mediaType == .movie || credit.mediaType == .tv {
+                            NavigationLink(value: credit) {
+                                row
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            row
+                        }
                     }
                 }
             }
@@ -215,11 +243,13 @@ private struct CreditCardView: View {
             .frame(width: 140, height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .contentShape(Rectangle())
-            .onTapGesture {
-                if imageURL != nil {
-                    onImageTap()
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
                 }
-            }
+            )
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
