@@ -34,6 +34,20 @@ struct HomeView: View {
             }
             .navigationTitle("Badminton")
             .searchable(text: $searchModel.query, placement: .toolbar, prompt: "Movies, TV, people")
+            .searchSuggestions {
+                let trimmed = searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty, !searchModel.history.isEmpty {
+                    Section("Recent searches") {
+                        ForEach(searchModel.history, id: \.self) { item in
+                            Text(item)
+                                .searchCompletion(item)
+                        }
+                        Button("Clear Recent Searches") {
+                            searchModel.clearHistory()
+                        }
+                    }
+                }
+            }
             .navigationDestination(for: TMDBSearchResultItem.self) { item in
                 switch item.mediaType {
                 case .tv:
