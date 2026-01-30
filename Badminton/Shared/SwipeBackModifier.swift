@@ -14,7 +14,6 @@ private final class SwipeBackView: NSView {
 
         recognizer.target = self
         recognizer.action = #selector(handlePan(_:))
-        recognizer.allowedTouchTypes = [.direct, .indirect]
         addGestureRecognizer(recognizer)
     }
 
