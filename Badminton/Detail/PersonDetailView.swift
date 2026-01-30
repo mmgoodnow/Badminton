@@ -8,7 +8,6 @@ struct PersonDetailView: View {
     let profilePathFallback: String?
 
     @StateObject private var viewModel: PersonDetailViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var lightboxItem: ImageLightboxItem?
 
     init(personID: Int, name: String? = nil, profilePath: String? = nil) {
@@ -59,7 +58,7 @@ struct PersonDetailView: View {
             }
         }
         .imageLightbox(item: $lightboxItem)
-        .macOSSwipeToDismiss { dismiss() }
+        .macOSSwipeToDismiss()
         .task {
             await viewModel.load()
         }

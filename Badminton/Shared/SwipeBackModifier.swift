@@ -71,11 +71,29 @@ extension View {
     func macOSSwipeToDismiss(_ action: @escaping () -> Void) -> some View {
         background(SwipeBackRecognizer(onSwipe: action))
     }
+
+    func macOSSwipeToDismiss() -> some View {
+        modifier(MacOSSwipeToDismissModifier())
+    }
 }
 #else
 extension View {
     func macOSSwipeToDismiss(_ action: @escaping () -> Void) -> some View {
         self
+    }
+
+    func macOSSwipeToDismiss() -> some View {
+        self
+    }
+}
+#endif
+
+#if os(macOS)
+private struct MacOSSwipeToDismissModifier: ViewModifier {
+    @Environment(\.dismiss) private var dismiss
+
+    func body(content: Content) -> some View {
+        content.macOSSwipeToDismiss { dismiss() }
     }
 }
 #endif

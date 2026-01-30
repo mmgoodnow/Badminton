@@ -78,6 +78,7 @@ struct TVSeasonDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .imageLightbox(item: $lightboxItem)
+        .macOSSwipeToDismiss()
         .navigationDestination(item: $selectedEpisode) { route in
             EpisodeDetailView(
                 tvID: route.tvID,

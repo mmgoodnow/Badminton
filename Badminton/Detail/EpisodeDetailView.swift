@@ -10,7 +10,6 @@ struct EpisodeDetailView: View {
     let stillPathFallback: String?
 
     @StateObject private var viewModel: EpisodeDetailViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var lightboxItem: ImageLightboxItem?
 
     init(tvID: Int,
@@ -58,7 +57,7 @@ struct EpisodeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .imageLightbox(item: $lightboxItem)
-        .macOSSwipeToDismiss { dismiss() }
+        .macOSSwipeToDismiss()
         .task {
             await viewModel.load()
         }

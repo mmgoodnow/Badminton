@@ -8,7 +8,6 @@ struct MovieDetailView: View {
     let posterPathFallback: String?
 
     @StateObject private var viewModel: MovieDetailViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var lightboxItem: ImageLightboxItem?
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
@@ -47,7 +46,7 @@ struct MovieDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .imageLightbox(item: $lightboxItem)
-        .macOSSwipeToDismiss { dismiss() }
+        .macOSSwipeToDismiss()
         .task {
             await viewModel.load()
         }
