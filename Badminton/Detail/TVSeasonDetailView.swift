@@ -9,6 +9,7 @@ struct TVSeasonDetailView: View {
     let posterPath: String?
 
     @StateObject private var viewModel: TVSeasonDetailViewModel
+    @State private var lightboxItem: ImageLightboxItem?
 
     init(tvID: Int, seasonNumber: Int, seasonName: String, posterPath: String? = nil) {
         self.tvID = tvID
@@ -49,7 +50,15 @@ struct TVSeasonDetailView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(detail.episodes) { episode in
-                                EpisodeRow(episode: episode, imageURL: viewModel.stillURL(path: episode.stillPath))
+                                EpisodeRow(
+                                    episode: episode,
+                                    imageURL: viewModel.stillURL(path: episode.stillPath),
+                                    onImageTap: {
+                                        if let url = viewModel.stillURL(path: episode.stillPath) {
+                                            showLightbox(url: url, title: episode.name)
+                                        }
+                                    }
+                                )
                             }
                         }
                     }
@@ -61,6 +70,9 @@ struct TVSeasonDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .sheet(item: $lightboxItem) { item in
+            ImageLightboxView(item: item)
+        }
         .task {
             await viewModel.load()
         }
@@ -82,6 +94,11 @@ struct TVSeasonDetailView: View {
             }
             .frame(width: 120, height: 180)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPath) {
+                    showLightbox(url: url, title: viewModel.title ?? seasonName)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? seasonName)
@@ -100,11 +117,16 @@ struct TVSeasonDetailView: View {
             Spacer(minLength: 0)
         }
     }
+
+    private func showLightbox(url: URL, title: String) {
+        lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
 }
 
 private struct EpisodeRow: View {
     let episode: TMDBEpisode
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -119,6 +141,14 @@ private struct EpisodeRow: View {
             }
             .frame(width: 90, height: 54)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
+                }
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("E\(episode.episodeNumber) · \(episode.name)")

@@ -50,13 +50,6 @@ struct SearchView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Search TMDB")
-                    .font(.title2.bold())
-                Text("Find movies, TV shows, and people.")
-                    .foregroundStyle(.secondary)
-            }
-
             if !viewModel.history.isEmpty {
                 historySection
             }

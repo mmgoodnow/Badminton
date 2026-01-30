@@ -9,6 +9,7 @@ struct TVDetailView: View {
 
     @StateObject private var viewModel: TVDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var lightboxItem: ImageLightboxItem?
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
@@ -45,6 +46,9 @@ struct TVDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .sheet(item: $lightboxItem) { item in
+            ImageLightboxView(item: item)
+        }
         .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()
@@ -89,6 +93,11 @@ struct TVDetailView: View {
         }
         .frame(width: 140, height: 210)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+            }
+        }
     }
 
     @ViewBuilder
@@ -152,7 +161,12 @@ struct TVDetailView: View {
                         } label: {
                             SeasonRow(
                                 season: season,
-                                imageURL: viewModel.posterURL(path: season.posterPath)
+                                imageURL: viewModel.posterURL(path: season.posterPath),
+                                onImageTap: {
+                                    if let url = viewModel.posterURL(path: season.posterPath) {
+                                        showLightbox(url: url, title: season.name)
+                                    }
+                                }
                             )
                         }
                         .buttonStyle(.plain)
@@ -177,7 +191,12 @@ struct TVDetailView: View {
                                     title: episode.name,
                                     subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
                                     overview: episode.overview,
-                                    imageURL: viewModel.stillURL(path: episode.stillPath)
+                                    imageURL: viewModel.stillURL(path: episode.stillPath),
+                                    onImageTap: {
+                                        if let url = viewModel.stillURL(path: episode.stillPath) {
+                                            showLightbox(url: url, title: episode.name)
+                                        }
+                                    }
                                 )
                             }
                         } else if let lastEpisode = detail.lastEpisodeToAir {
@@ -185,7 +204,12 @@ struct TVDetailView: View {
                                 title: lastEpisode.name,
                                 subtitle: episodeSubtitle(lastEpisode),
                                 overview: lastEpisode.overview,
-                                imageURL: viewModel.stillURL(path: lastEpisode.stillPath)
+                                imageURL: viewModel.stillURL(path: lastEpisode.stillPath),
+                                onImageTap: {
+                                    if let url = viewModel.stillURL(path: lastEpisode.stillPath) {
+                                        showLightbox(url: url, title: lastEpisode.name)
+                                    }
+                                }
                             )
                         }
 
@@ -194,7 +218,12 @@ struct TVDetailView: View {
                                 title: "Up next: \(nextEpisode.name)",
                                 subtitle: episodeSubtitle(nextEpisode),
                                 overview: nextEpisode.overview,
-                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath)
+                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath),
+                                onImageTap: {
+                                    if let url = viewModel.stillURL(path: nextEpisode.stillPath) {
+                                        showLightbox(url: url, title: nextEpisode.name)
+                                    }
+                                }
                             )
                         }
                     }
@@ -235,7 +264,15 @@ struct TVDetailView: View {
                         NavigationLink {
                             PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                         } label: {
-                            CastRow(member: member, imageURL: viewModel.profileURL(path: member.profilePath))
+                            CastRow(
+                                member: member,
+                                imageURL: viewModel.profileURL(path: member.profilePath),
+                                onImageTap: {
+                                    if let url = viewModel.profileURL(path: member.profilePath) {
+                                        showLightbox(url: url, title: member.name)
+                                    }
+                                }
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -258,11 +295,16 @@ struct TVDetailView: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    private func showLightbox(url: URL, title: String) {
+        lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
 }
 
 private struct CastRow: View {
     let member: TMDBCastMember
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -277,6 +319,14 @@ private struct CastRow: View {
             }
             .frame(width: 44, height: 66)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
+                }
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(member.name)
@@ -295,6 +345,7 @@ private struct CastRow: View {
 private struct SeasonRow: View {
     let season: TMDBTVSeasonSummary
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -309,6 +360,14 @@ private struct SeasonRow: View {
             }
             .frame(width: 70, height: 105)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
+                }
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(season.name)
@@ -338,6 +397,7 @@ private struct EpisodeCard: View {
     let subtitle: String
     let overview: String?
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -352,6 +412,12 @@ private struct EpisodeCard: View {
             }
             .frame(width: 220, height: 124)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if imageURL != nil {
+                    onImageTap()
+                }
+            }
 
             Text(title)
                 .font(.subheadline.weight(.semibold))

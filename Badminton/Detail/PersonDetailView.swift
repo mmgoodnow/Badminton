@@ -9,6 +9,7 @@ struct PersonDetailView: View {
 
     @StateObject private var viewModel: PersonDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var lightboxItem: ImageLightboxItem?
 
     init(personID: Int, name: String? = nil, profilePath: String? = nil) {
         self.personID = personID
@@ -44,6 +45,9 @@ struct PersonDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .sheet(item: $lightboxItem) { item in
+            ImageLightboxView(item: item)
+        }
         .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()
@@ -66,6 +70,11 @@ struct PersonDetailView: View {
             }
             .frame(width: 140, height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                if let url = viewModel.profileURL(path: viewModel.detail?.profilePath ?? profilePathFallback) {
+                    showLightbox(url: url, title: viewModel.name ?? nameFallback ?? "Profile")
+                }
+            }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.name ?? nameFallback ?? "")
@@ -129,7 +138,12 @@ struct PersonDetailView: View {
                             CreditCardView(
                                 title: credit.displayTitle,
                                 subtitle: viewModel.creditSubtitle(credit),
-                                imageURL: viewModel.posterURL(path: credit.posterPath)
+                                imageURL: viewModel.posterURL(path: credit.posterPath),
+                                onImageTap: {
+                                    if let url = viewModel.posterURL(path: credit.posterPath) {
+                                        showLightbox(url: url, title: credit.displayTitle)
+                                    }
+                                }
                             )
                         }
                     }
@@ -153,7 +167,12 @@ struct PersonDetailView: View {
                         CreditRowView(
                             title: credit.displayTitle,
                             subtitle: viewModel.creditSubtitle(credit),
-                            imageURL: viewModel.posterURL(path: credit.posterPath)
+                            imageURL: viewModel.posterURL(path: credit.posterPath),
+                            onImageTap: {
+                                if let url = viewModel.posterURL(path: credit.posterPath) {
+                                    showLightbox(url: url, title: credit.displayTitle)
+                                }
+                            }
                         )
                     }
                 }
@@ -171,12 +190,17 @@ struct PersonDetailView: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    private func showLightbox(url: URL, title: String) {
+        lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
 }
 
 private struct CreditCardView: View {
     let title: String
     let subtitle: String
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -191,6 +215,12 @@ private struct CreditCardView: View {
             }
             .frame(width: 140, height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if imageURL != nil {
+                    onImageTap()
+                }
+            }
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
@@ -209,6 +239,7 @@ private struct CreditRowView: View {
     let title: String
     let subtitle: String
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -223,6 +254,14 @@ private struct CreditRowView: View {
             }
             .frame(width: 70, height: 105)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
+                }
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)

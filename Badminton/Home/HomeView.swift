@@ -61,9 +61,6 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Home")
                 .font(.largeTitle.bold())
-            Text(searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Trending right now across TMDB" : "Search results")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 

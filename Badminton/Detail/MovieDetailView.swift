@@ -9,6 +9,7 @@ struct MovieDetailView: View {
 
     @StateObject private var viewModel: MovieDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var lightboxItem: ImageLightboxItem?
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
         self.movieID = movieID
@@ -43,6 +44,9 @@ struct MovieDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .sheet(item: $lightboxItem) { item in
+            ImageLightboxView(item: item)
+        }
         .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()
@@ -87,6 +91,11 @@ struct MovieDetailView: View {
         }
         .frame(width: 140, height: 210)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+            }
+        }
     }
 
     @ViewBuilder
@@ -140,7 +149,15 @@ struct MovieDetailView: View {
                         NavigationLink {
                             PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                         } label: {
-                            CastRow(member: member, imageURL: viewModel.profileURL(path: member.profilePath))
+                            CastRow(
+                                member: member,
+                                imageURL: viewModel.profileURL(path: member.profilePath),
+                                onImageTap: {
+                                    if let url = viewModel.profileURL(path: member.profilePath) {
+                                        showLightbox(url: url, title: member.name)
+                                    }
+                                }
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -163,11 +180,16 @@ struct MovieDetailView: View {
                 .foregroundStyle(.secondary)
         }
     }
+
+    private func showLightbox(url: URL, title: String) {
+        lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
 }
 
 private struct CastRow: View {
     let member: TMDBCastMember
     let imageURL: URL?
+    let onImageTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -182,6 +204,14 @@ private struct CastRow: View {
             }
             .frame(width: 44, height: 66)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                TapGesture().onEnded {
+                    if imageURL != nil {
+                        onImageTap()
+                    }
+                }
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(member.name)
