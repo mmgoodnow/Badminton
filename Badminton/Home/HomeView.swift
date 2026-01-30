@@ -4,6 +4,7 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @StateObject private var searchModel = SearchViewModel()
 
     var body: some View {
         NavigationStack {
@@ -11,21 +12,40 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
 
-                    if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
+                    if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if let errorMessage = viewModel.errorMessage {
+                            Text(errorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
 
-                    if viewModel.isLoading && viewModel.trendingMovies.isEmpty && viewModel.trendingTV.isEmpty {
-                        ProgressView("Loading trending titles…")
-                            .frame(maxWidth: .infinity, alignment: .center)
+                        if viewModel.isLoading && viewModel.trendingMovies.isEmpty && viewModel.trendingTV.isEmpty {
+                            ProgressView("Loading trending titles…")
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            trendingSection(title: "Trending Movies", items: viewModel.trendingMovies.map { .movie($0) })
+                            trendingSection(title: "Trending TV", items: viewModel.trendingTV.map { .tv($0) })
+                        }
                     } else {
-                        trendingSection(title: "Trending Movies", items: viewModel.trendingMovies.map { .movie($0) })
-                        trendingSection(title: "Trending TV", items: viewModel.trendingTV.map { .tv($0) })
+                        searchResultsSection
                     }
                 }
                 .padding()
+            }
+            .searchable(text: $searchModel.query, placement: .toolbar, prompt: "Movies, TV, people")
+            .navigationDestination(for: TMDBSearchResultItem.self) { item in
+                switch item.mediaType {
+                case .tv:
+                    TVDetailView(tvID: item.id, title: item.displayTitle, posterPath: item.posterPath)
+                case .movie:
+                    MovieDetailView(movieID: item.id, title: item.displayTitle, posterPath: item.posterPath)
+                case .person:
+                    PersonDetailView(personID: item.id, name: item.displayTitle, profilePath: item.profilePath)
+                case .unknown:
+                    Text("Details coming soon.")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
             }
             .task {
                 await viewModel.load()
@@ -40,9 +60,31 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Home")
                 .font(.largeTitle.bold())
-            Text("Trending right now across TMDB")
+            Text(searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Trending right now across TMDB" : "Search results")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var searchResultsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if searchModel.isSearching {
+                ProgressView("Searching…")
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if searchModel.results.isEmpty {
+                Text("No results")
+                    .font(.headline)
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(searchModel.results) { item in
+                        NavigationLink(value: item) {
+                            SearchResultRow(item: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
 

@@ -137,7 +137,12 @@ struct MovieDetailView: View {
             if let cast = viewModel.credits?.cast, !cast.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(cast.prefix(10)) { member in
-                        CastRow(member: member, imageURL: viewModel.profileURL(path: member.profilePath))
+                        NavigationLink {
+                            PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                        } label: {
+                            CastRow(member: member, imageURL: viewModel.profileURL(path: member.profilePath))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             } else {
