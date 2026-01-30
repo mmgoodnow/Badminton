@@ -164,14 +164,23 @@ struct TVDetailView: View {
 
     @ViewBuilder
     private func latestEpisodeSection(detail: TMDBTVSeriesDetail) -> some View {
-        if detail.lastEpisodeToAir != nil {
+        if !viewModel.latestEpisodes.isEmpty || detail.lastEpisodeToAir != nil {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Latest episode")
+                Text("Latest episodes")
                     .font(.headline)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        if let lastEpisode = detail.lastEpisodeToAir {
+                        if !viewModel.latestEpisodes.isEmpty {
+                            ForEach(viewModel.latestEpisodes.prefix(10)) { episode in
+                                EpisodeCard(
+                                    title: episode.name,
+                                    subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
+                                    overview: episode.overview,
+                                    imageURL: viewModel.stillURL(path: episode.stillPath)
+                                )
+                            }
+                        } else if let lastEpisode = detail.lastEpisodeToAir {
                             EpisodeCard(
                                 title: lastEpisode.name,
                                 subtitle: episodeSubtitle(lastEpisode),
@@ -179,6 +188,7 @@ struct TVDetailView: View {
                                 imageURL: viewModel.stillURL(path: lastEpisode.stillPath)
                             )
                         }
+
                         if let nextEpisode = detail.nextEpisodeToAir {
                             EpisodeCard(
                                 title: "Up next: \(nextEpisode.name)",
@@ -196,6 +206,19 @@ struct TVDetailView: View {
     private func episodeSubtitle(_ episode: TMDBEpisodeSummary) -> String {
         var parts: [String] = []
         parts.append("S\(episode.seasonNumber) · E\(episode.episodeNumber)")
+        if let airDate = episode.airDate, !airDate.isEmpty {
+            parts.append(airDate)
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    private func episodeSubtitle(_ episode: TMDBEpisode, fallbackSeason: Int?) -> String {
+        var parts: [String] = []
+        if let season = fallbackSeason {
+            parts.append("S\(season) · E\(episode.episodeNumber)")
+        } else {
+            parts.append("E\(episode.episodeNumber)")
+        }
         if let airDate = episode.airDate, !airDate.isEmpty {
             parts.append(airDate)
         }
@@ -355,6 +378,7 @@ private struct EpisodeCard: View {
 final class TVDetailViewModel: ObservableObject {
     @Published var detail: TMDBTVSeriesDetail?
     @Published var credits: TMDBCredits?
+    @Published private(set) var latestEpisodes: [TMDBEpisode] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -392,6 +416,14 @@ final class TVDetailViewModel: ObservableObject {
             imageConfig = configResponse.images
             self.detail = detailResponse
             self.credits = creditsResponse
+            latestEpisodes = []
+
+            if let seasonNumber = latestSeasonNumber(from: detailResponse) {
+                if let seasonDetail: TMDBTVSeasonDetail = try? await client.getV3(path: "/3/tv/\(tvID)/season/\(seasonNumber)") {
+                    latestEpisodes = latestEpisodes(from: seasonDetail)
+                }
+            }
+
             hasLoaded = true
         } catch {
             errorMessage = error.localizedDescription
@@ -426,6 +458,33 @@ final class TVDetailViewModel: ObservableObject {
             return fallback
         }
         return sizes.last ?? fallback
+    }
+
+    private func latestSeasonNumber(from detail: TMDBTVSeriesDetail) -> Int? {
+        if let last = detail.lastEpisodeToAir?.seasonNumber {
+            return last
+        }
+        return detail.seasons
+            .filter { $0.seasonNumber > 0 }
+            .map(\.seasonNumber)
+            .max()
+    }
+
+    private func latestEpisodes(from season: TMDBTVSeasonDetail) -> [TMDBEpisode] {
+        let sorted = season.episodes.sorted { lhs, rhs in
+            switch (lhs.airDate, rhs.airDate) {
+            case let (l?, r?):
+                if l == r { return lhs.episodeNumber > rhs.episodeNumber }
+                return l > r
+            case (nil, _?):
+                return false
+            case (_?, nil):
+                return true
+            default:
+                return lhs.episodeNumber > rhs.episodeNumber
+            }
+        }
+        return sorted
     }
 }
 
