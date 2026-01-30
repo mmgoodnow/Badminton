@@ -21,6 +21,24 @@ private final class SwipeBackView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        activateIfNeeded()
+    }
+
+    deinit {
+        removeMonitorIfNeeded()
+    }
+
+    private func removeMonitorIfNeeded() {
+        guard SwipeBackView.activeView === self else { return }
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        monitor = nil
+        SwipeBackView.activeMonitor = nil
+        SwipeBackView.activeView = nil
+    }
+
+    func activateIfNeeded() {
         guard window != nil else {
             removeMonitorIfNeeded()
             return
@@ -39,20 +57,6 @@ private final class SwipeBackView: NSView {
         }
         SwipeBackView.activeMonitor = monitor
     }
-
-    deinit {
-        removeMonitorIfNeeded()
-    }
-
-    private func removeMonitorIfNeeded() {
-        guard SwipeBackView.activeView === self else { return }
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        monitor = nil
-        SwipeBackView.activeMonitor = nil
-        SwipeBackView.activeView = nil
-    }
 }
 
 private struct SwipeBackRecognizer: NSViewRepresentable {
@@ -64,6 +68,7 @@ private struct SwipeBackRecognizer: NSViewRepresentable {
 
     func updateNSView(_ nsView: SwipeBackView, context: Context) {
         nsView.onSwipe = onSwipe
+        nsView.activateIfNeeded()
     }
 }
 
