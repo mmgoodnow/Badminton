@@ -49,13 +49,51 @@ struct SearchView: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Search TMDB")
-                .font(.title2.bold())
-            Text("Find movies, TV shows, and people.")
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Search TMDB")
+                    .font(.title2.bold())
+                Text("Find movies, TV shows, and people.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if !viewModel.history.isEmpty {
+                historySection
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Recent searches")
+                    .font(.headline)
+                Spacer()
+                Button("Clear") {
+                    viewModel.clearHistory()
+                }
+                .buttonStyle(.borderless)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(viewModel.history, id: \.self) { item in
+                    Button {
+                        viewModel.query = item
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock")
+                                .foregroundStyle(.secondary)
+                            Text(item)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 }
 
@@ -146,12 +184,15 @@ final class SearchViewModel: ObservableObject {
     @Published var query: String = ""
     @Published private(set) var results: [TMDBSearchResultItem] = []
     @Published private(set) var isSearching = false
+    @Published private(set) var history: [String] = []
 
     private let client: TMDBAPIClient
     private var cancellables = Set<AnyCancellable>()
+    private let historyKey = "tmdb.search.history"
 
     init(client: TMDBAPIClient = TMDBAPIClient()) {
         self.client = client
+        history = UserDefaults.standard.stringArray(forKey: historyKey) ?? []
 
         $query
             .removeDuplicates()
@@ -163,7 +204,8 @@ final class SearchViewModel: ObservableObject {
     }
 
     func search(query: String) async {
-        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
             results = []
             return
         }
@@ -179,10 +221,24 @@ final class SearchViewModel: ObservableObject {
                     URLQueryItem(name: "include_adult", value: "false"),
                 ]
             )
+            guard query == self.query else { return }
             results = response.results
+            addToHistory(trimmed)
         } catch {
             results = []
         }
+    }
+
+    func clearHistory() {
+        history = []
+        UserDefaults.standard.removeObject(forKey: historyKey)
+    }
+
+    private func addToHistory(_ query: String) {
+        guard query.count >= 2 else { return }
+        let updated = [query] + history.filter { $0.caseInsensitiveCompare(query) != .orderedSame }
+        history = Array(updated.prefix(12))
+        UserDefaults.standard.set(history, forKey: historyKey)
     }
 
     static func posterURL(path: String, size: String) -> URL? {
