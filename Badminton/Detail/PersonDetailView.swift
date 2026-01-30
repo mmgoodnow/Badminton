@@ -45,18 +45,6 @@ struct PersonDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .navigationDestination(for: TMDBMediaCredit.self) { credit in
-            switch credit.mediaType {
-            case .movie:
-                MovieDetailView(movieID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
-            case .tv:
-                TVDetailView(tvID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
-            case .person, .unknown:
-                Text("Details coming soon.")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-            }
-        }
         .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss()
         .task {

@@ -65,6 +65,18 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .navigationDestination(for: TMDBMediaCredit.self) { credit in
+                switch credit.mediaType {
+                case .movie:
+                    MovieDetailView(movieID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+                case .tv:
+                    TVDetailView(tvID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+                case .person, .unknown:
+                    Text("Details coming soon.")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+            }
             .task {
                 await viewModel.load()
             }
