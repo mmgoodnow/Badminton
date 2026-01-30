@@ -43,6 +43,10 @@ struct ImageLightboxView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            close()
+        }
         .onExitCommand {
             close()
         }
