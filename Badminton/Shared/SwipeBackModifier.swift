@@ -6,6 +6,8 @@ import AppKit
 private final class SwipeBackView: NSView {
     var onSwipe: () -> Void
     private var monitor: Any?
+    private static weak var activeView: SwipeBackView?
+    private static var activeMonitor: Any?
 
     init(onSwipe: @escaping () -> Void) {
         self.onSwipe = onSwipe
@@ -17,28 +19,39 @@ private final class SwipeBackView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func swipe(with event: NSEvent) {
-        if event.deltaX > 0 {
-            onSwipe()
-        }
-    }
-
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard monitor == nil else { return }
+        guard window != nil else {
+            removeMonitorIfNeeded()
+            return
+        }
+        guard SwipeBackView.activeView !== self else { return }
+        SwipeBackView.activeView?.removeMonitorIfNeeded()
+        SwipeBackView.activeView = self
+
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.swipe]) { [weak self] event in
             guard let self else { return event }
             if event.deltaX > 0 {
                 self.onSwipe()
+                return nil
             }
             return event
         }
+        SwipeBackView.activeMonitor = monitor
     }
 
     deinit {
+        removeMonitorIfNeeded()
+    }
+
+    private func removeMonitorIfNeeded() {
+        guard SwipeBackView.activeView === self else { return }
         if let monitor {
             NSEvent.removeMonitor(monitor)
         }
+        monitor = nil
+        SwipeBackView.activeMonitor = nil
+        SwipeBackView.activeView = nil
     }
 }
 
