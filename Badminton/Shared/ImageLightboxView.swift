@@ -16,8 +16,6 @@ struct ImageLightboxView: View {
     let onDismiss: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
 
     var body: some View {
         ZStack {
@@ -28,24 +26,12 @@ struct ImageLightboxView: View {
                     close()
                 }
 
-#if os(macOS)
-            ZoomableImageView(url: item.url)
-#else
-            GeometryReader { proxy in
-                ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                    KFImage(item.url)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width * scale,
-                               height: proxy.size.height * scale)
-                        .clipped()
-                }
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .gesture(magnificationGesture)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
-#endif
+            KFImage(item.url)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .ignoresSafeArea()
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -63,18 +49,6 @@ struct ImageLightboxView: View {
         onDismiss?()
         dismiss()
     }
-
-#if !os(macOS)
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                scale = max(1, lastScale * value)
-            }
-            .onEnded { _ in
-                lastScale = scale
-            }
-    }
-#endif
 }
 
 extension View {
@@ -126,60 +100,6 @@ private final class KeyCatcherView: NSView {
 
     override func keyDown(with event: NSEvent) {
         onKey?()
-    }
-}
-
-private struct ZoomableImageView: NSViewRepresentable {
-    let url: URL
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        scrollView.drawsBackground = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.hasVerticalScroller = false
-        scrollView.automaticallyAdjustsContentInsets = false
-        scrollView.allowsMagnification = true
-        scrollView.minMagnification = 1
-        scrollView.maxMagnification = 6
-        scrollView.magnification = 1
-
-        let hostingView = NSHostingView(rootView: AnyView(imageView))
-        hostingView.frame = scrollView.contentView.bounds
-        scrollView.documentView = hostingView
-
-        context.coordinator.hostingView = hostingView
-        context.coordinator.currentURL = url
-        return scrollView
-    }
-
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        if context.coordinator.currentURL != url {
-            context.coordinator.currentURL = url
-            context.coordinator.hostingView?.rootView = AnyView(imageView)
-        }
-        if let hostingView = context.coordinator.hostingView {
-            let size = nsView.contentView.bounds.size
-            if hostingView.frame.size != size {
-                hostingView.frame = NSRect(origin: .zero, size: size)
-            }
-        }
-    }
-
-    private var imageView: some View {
-        KFImage(url)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-    }
-
-    final class Coordinator {
-        var hostingView: NSHostingView<AnyView>?
-        var currentURL: URL?
     }
 }
 #endif
