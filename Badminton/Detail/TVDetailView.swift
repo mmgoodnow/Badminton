@@ -213,15 +213,14 @@ struct TVDetailView: View {
                         }
 
                         if let nextEpisode = detail.nextEpisodeToAir,
-                           let stillPath = nextEpisode.stillPath,
-                           !stillPath.isEmpty {
+                           !viewModel.isFutureEpisode(nextEpisode.airDate) {
                             EpisodeCard(
                                 title: "Up next: \(nextEpisode.name)",
                                 subtitle: episodeSubtitle(nextEpisode),
                                 overview: nextEpisode.overview,
-                                imageURL: viewModel.stillURL(path: stillPath),
+                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath),
                                 onImageTap: {
-                                    if let url = viewModel.stillURL(path: stillPath) {
+                                    if let url = viewModel.stillURL(path: nextEpisode.stillPath) {
                                         showLightbox(url: url, title: nextEpisode.name)
                                     }
                                 }
@@ -555,7 +554,14 @@ final class TVDetailViewModel: ObservableObject {
                 return lhs.episodeNumber > rhs.episodeNumber
             }
         }
-        return sorted
+        return sorted.filter { !isFutureEpisode($0.airDate) }
+    }
+
+    func isFutureEpisode(_ airDate: String?) -> Bool {
+        guard let airDate, let date = TMDBDateFormatter.input.date(from: airDate) else {
+            return false
+        }
+        return date > Date()
     }
 }
 
