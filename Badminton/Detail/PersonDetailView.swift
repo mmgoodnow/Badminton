@@ -84,7 +84,7 @@ struct PersonDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if let birthday = viewModel.detail?.birthday, !birthday.isEmpty {
+                if let birthday = TMDBDateFormatter.format(viewModel.detail?.birthday) {
                     Text("Born \(birthday)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -113,7 +113,7 @@ struct PersonDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Info")
                 .font(.headline)
-            if let deathday = detail.deathday, !deathday.isEmpty {
+            if let deathday = TMDBDateFormatter.format(detail.deathday) {
                 infoRow(label: "Died", value: deathday)
             }
             if let department = detail.knownForDepartment, !department.isEmpty {

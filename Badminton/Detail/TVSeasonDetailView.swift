@@ -103,7 +103,7 @@ struct TVSeasonDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? seasonName)
                     .font(.title.bold())
-                if let airDate = viewModel.detail?.airDate, !airDate.isEmpty {
+                if let airDate = TMDBDateFormatter.format(viewModel.detail?.airDate) {
                     Text(airDate)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -159,7 +159,7 @@ private struct EpisodeRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-                if let airDate = episode.airDate, !airDate.isEmpty {
+                if let airDate = TMDBDateFormatter.format(episode.airDate) {
                     Text(airDate)
                         .font(.caption)
                         .foregroundStyle(.secondary)

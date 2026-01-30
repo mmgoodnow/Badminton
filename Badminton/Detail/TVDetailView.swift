@@ -69,7 +69,7 @@ struct TVDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if let date = viewModel.detail?.firstAirDate, !date.isEmpty {
+                if let date = TMDBDateFormatter.format(viewModel.detail?.firstAirDate) {
                     Text(date)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -133,7 +133,7 @@ struct TVDetailView: View {
             infoRow(label: "Seasons", value: String(detail.numberOfSeasons))
             infoRow(label: "Episodes", value: String(detail.numberOfEpisodes))
             infoRow(label: "Status", value: detail.status ?? "")
-            if let lastAir = detail.lastAirDate, !lastAir.isEmpty {
+            if let lastAir = TMDBDateFormatter.format(detail.lastAirDate) {
                 infoRow(label: "Last Air Date", value: lastAir)
             }
         }
@@ -235,7 +235,7 @@ struct TVDetailView: View {
     private func episodeSubtitle(_ episode: TMDBEpisodeSummary) -> String {
         var parts: [String] = []
         parts.append("S\(episode.seasonNumber) · E\(episode.episodeNumber)")
-        if let airDate = episode.airDate, !airDate.isEmpty {
+        if let airDate = TMDBDateFormatter.format(episode.airDate) {
             parts.append(airDate)
         }
         return parts.joined(separator: " • ")
@@ -248,7 +248,7 @@ struct TVDetailView: View {
         } else {
             parts.append("E\(episode.episodeNumber)")
         }
-        if let airDate = episode.airDate, !airDate.isEmpty {
+        if let airDate = TMDBDateFormatter.format(episode.airDate) {
             parts.append(airDate)
         }
         return parts.joined(separator: " • ")
@@ -372,7 +372,7 @@ private struct SeasonRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(season.name)
                     .font(.subheadline.weight(.semibold))
-                if let airDate = season.airDate, !airDate.isEmpty {
+                if let airDate = TMDBDateFormatter.format(season.airDate) {
                     Text(airDate)
                         .font(.caption)
                         .foregroundStyle(.secondary)

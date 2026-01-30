@@ -69,8 +69,8 @@ private struct PosterThumb: View {
 
 private extension TMDBSearchResultItem {
     var subtitleText: String {
-        if let date = releaseDate, !date.isEmpty { return date }
-        if let date = firstAirDate, !date.isEmpty { return date }
+        if let date = TMDBDateFormatter.format(releaseDate) { return date }
+        if let date = TMDBDateFormatter.format(firstAirDate) { return date }
         if let department = knownForDepartment, !department.isEmpty { return department }
         return ""
     }

@@ -67,7 +67,7 @@ struct MovieDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if let date = viewModel.detail?.releaseDate, !date.isEmpty {
+                if let date = TMDBDateFormatter.format(viewModel.detail?.releaseDate) {
                     Text(date)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

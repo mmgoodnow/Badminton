@@ -143,9 +143,9 @@ private enum HomeMediaItem {
     var subtitle: String {
         switch self {
         case .movie(let movie):
-            return movie.releaseDate ?? ""
+            return TMDBDateFormatter.format(movie.releaseDate) ?? movie.releaseDate ?? ""
         case .tv(let tv):
-            return tv.firstAirDate ?? ""
+            return TMDBDateFormatter.format(tv.firstAirDate) ?? tv.firstAirDate ?? ""
         }
     }
 
