@@ -8,6 +8,7 @@ struct TVDetailView: View {
     let posterPathFallback: String?
 
     @StateObject private var viewModel: TVDetailViewModel
+    @Environment(\.dismiss) private var dismiss
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
@@ -43,6 +44,7 @@ struct TVDetailView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()
         }

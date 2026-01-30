@@ -38,6 +38,9 @@ final class TMDBAuthManager: NSObject, ObservableObject {
         )
 
         let authURL = try makeAuthURL(requestToken: requestTokenResponse.requestToken)
+#if DEBUG
+        print("TMDB auth URL:", authURL.absoluteString)
+#endif
         let callbackURL = try await beginWebAuthentication(url: authURL)
         let query = Self.queryItems(from: callbackURL)
         if query["approved"] == "false" {

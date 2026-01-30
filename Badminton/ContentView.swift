@@ -2,10 +2,27 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var authManager: TMDBAuthManager
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isSigningIn = false
     @State private var errorMessage: String?
 
     var body: some View {
+        ZStack {
+            backgroundView
+            if authManager.isAuthenticated {
+                TabView {
+                    HomeView()
+                        .tabItem { Label("Home", systemImage: "sparkles") }
+                    SearchView()
+                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                }
+            } else {
+                authGate
+            }
+        }
+    }
+
+    private var authGate: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -22,7 +39,7 @@ struct ContentView: View {
                             configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
                             configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
                             configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
-                            Text("Set these in Badminton/Info.plist.")
+                            Text("Set these in Secrets.xcconfig or via Xcode Cloud env vars.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -31,27 +48,14 @@ struct ContentView: View {
 
                     GroupBox("Session") {
                         VStack(alignment: .leading, spacing: 12) {
-                            if authManager.isAuthenticated {
-                                Text("Signed in")
-                                    .font(.headline)
-                                if let accountID = authManager.accountID {
-                                    Text("Account: \(accountID)")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Button("Sign Out") {
-                                    Task { await authManager.signOut() }
-                                }
-                            } else {
-                                if isSigningIn {
-                                    ProgressView("Connecting…")
-                                }
-                                Button("Sign in with TMDB") {
-                                    Task { await signIn() }
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(!canSignIn)
+                            if isSigningIn {
+                                ProgressView("Connecting…")
                             }
+                            Button("Sign in with TMDB") {
+                                Task { await signIn() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!canSignIn)
 
                             if let errorMessage {
                                 Text(errorMessage)
@@ -97,6 +101,21 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var backgroundView: some View {
+        Group {
+            if colorScheme == .dark {
+                Color.black
+            } else {
+#if os(macOS)
+                Color(nsColor: .windowBackgroundColor)
+#else
+                Color(uiColor: .systemBackground)
+#endif
+            }
+        }
+        .ignoresSafeArea()
     }
 }
 

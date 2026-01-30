@@ -56,7 +56,13 @@ struct TMDBAPIClient {
     }
 
     private func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError {
+            throw TMDBAPIError.network(host: request.url?.host ?? "unknown", code: error.code)
+        }
         guard let httpResponse = response as? HTTPURLResponse else {
             throw TMDBAPIError.invalidResponse
         }
@@ -81,6 +87,7 @@ enum TMDBAPIError: LocalizedError {
     case invalidResponse
     case httpStatus(Int)
     case server(statusCode: Int, message: String)
+    case network(host: String, code: URLError.Code)
 
     var errorDescription: String? {
         switch self {
@@ -94,6 +101,8 @@ enum TMDBAPIError: LocalizedError {
             return "Server returned status code \(code)."
         case .server(_, let message):
             return message
+        case .network(let host, let code):
+            return "Network error (\(code.rawValue)) while contacting \(host)."
         }
     }
 }
