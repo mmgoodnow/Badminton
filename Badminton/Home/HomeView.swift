@@ -55,24 +55,21 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(items, id: \.id) { item in
-                        if item.isTV {
-                            NavigationLink {
+                        NavigationLink {
+                            switch item {
+                            case .tv:
                                 TVDetailView(tvID: item.id, title: item.displayTitle, posterPath: item.posterPath)
-                            } label: {
-                                PosterCardView(
-                                    title: item.displayTitle,
-                                    subtitle: item.subtitle,
-                                    imageURL: viewModel.posterURL(path: item.posterPath)
-                                )
+                            case .movie:
+                                MovieDetailView(movieID: item.id, title: item.displayTitle, posterPath: item.posterPath)
                             }
-                            .buttonStyle(.plain)
-                        } else {
+                        } label: {
                             PosterCardView(
                                 title: item.displayTitle,
                                 subtitle: item.subtitle,
                                 imageURL: viewModel.posterURL(path: item.posterPath)
                             )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.vertical, 4)
@@ -121,10 +118,6 @@ private enum HomeMediaItem {
         }
     }
 
-    var isTV: Bool {
-        if case .tv = self { return true }
-        return false
-    }
 }
 
 private struct PosterCardView: View {
