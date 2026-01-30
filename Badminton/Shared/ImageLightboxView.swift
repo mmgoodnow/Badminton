@@ -47,6 +47,13 @@ struct ImageLightboxView: View {
         .background(KeyDismissView(onKey: { close() }))
 #endif
         .macOSSwipeToDismiss { close() }
+        .navigationTitle("")
+#if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+#elseif os(macOS)
+        .toolbar(.hidden, for: .windowToolbar)
+#endif
     }
 
     private func close() {
