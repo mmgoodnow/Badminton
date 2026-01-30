@@ -13,6 +13,7 @@ struct ImageLightboxItem: Identifiable {
 
 struct ImageLightboxView: View {
     let item: ImageLightboxItem
+    let onDismiss: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1
@@ -40,14 +41,19 @@ struct ImageLightboxView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            dismiss()
+            close()
         }
         .onExitCommand {
-            dismiss()
+            close()
         }
 #if os(macOS)
-        .background(KeyDismissView(onKey: { dismiss() }))
+        .background(KeyDismissView(onKey: { close() }))
 #endif
+    }
+
+    private func close() {
+        onDismiss?()
+        dismiss()
     }
 
     private var magnificationGesture: some Gesture {
@@ -58,6 +64,25 @@ struct ImageLightboxView: View {
             .onEnded { _ in
                 lastScale = scale
             }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func imageLightbox(item: Binding<ImageLightboxItem?>) -> some View {
+#if os(macOS)
+        overlay {
+            if let value = item.wrappedValue {
+                ImageLightboxView(item: value, onDismiss: { item.wrappedValue = nil })
+                    .transition(.opacity)
+                    .zIndex(999)
+            }
+        }
+#else
+        sheet(item: item) { value in
+            ImageLightboxView(item: value, onDismiss: nil)
+        }
+#endif
     }
 }
 

@@ -42,13 +42,12 @@ struct TVDetailView: View {
             }
             .padding()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(viewModel.title ?? titleFallback ?? "TV Show")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .sheet(item: $lightboxItem) { item in
-            ImageLightboxView(item: item)
-        }
+        .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()

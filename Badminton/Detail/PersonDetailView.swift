@@ -41,13 +41,12 @@ struct PersonDetailView: View {
             }
             .padding()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(viewModel.name ?? nameFallback ?? "Person")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .sheet(item: $lightboxItem) { item in
-            ImageLightboxView(item: item)
-        }
+        .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss { dismiss() }
         .task {
             await viewModel.load()
