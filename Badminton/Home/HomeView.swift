@@ -10,8 +10,6 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    header
-
                     if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
@@ -73,13 +71,6 @@ struct HomeView: View {
             .refreshable {
                 await viewModel.load(force: true)
             }
-        }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Badminton")
-                .font(.largeTitle.bold())
         }
     }
 
