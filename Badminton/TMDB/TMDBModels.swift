@@ -126,6 +126,39 @@ struct TMDBTVSeriesDetail: Decodable, Identifiable, Hashable {
     let voteAverage: Double
     let voteCount: Int
     let genres: [TMDBGenre]
+    let seasons: [TMDBTVSeasonSummary]
+}
+
+struct TMDBTVSeasonSummary: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let seasonNumber: Int
+    let episodeCount: Int
+    let airDate: String?
+    let overview: String?
+    let posterPath: String?
+}
+
+struct TMDBTVSeasonDetail: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let seasonNumber: Int
+    let airDate: String?
+    let overview: String?
+    let posterPath: String?
+    let episodes: [TMDBEpisode]
+}
+
+struct TMDBEpisode: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let episodeNumber: Int
+    let airDate: String?
+    let overview: String?
+    let stillPath: String?
+    let voteAverage: Double?
+    let voteCount: Int?
+    let runtime: Int?
 }
 
 struct TMDBPersonDetail: Decodable, Identifiable, Hashable {
@@ -204,4 +237,5 @@ struct TMDBImageConfigValues: Decodable, Hashable {
     let posterSizes: [String]
     let backdropSizes: [String]
     let profileSizes: [String]
+    let stillSizes: [String]?
 }
