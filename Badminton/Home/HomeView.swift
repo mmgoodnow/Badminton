@@ -91,9 +91,12 @@ struct HomeView: View {
                 ProgressView("Searching…")
                     .frame(maxWidth: .infinity, alignment: .center)
             } else if searchModel.results.isEmpty {
-                Text("No results")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                VStack {
+                    Text("No results")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 160, alignment: .center)
             } else {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(searchModel.results) { item in
