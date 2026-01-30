@@ -46,6 +46,7 @@ struct ImageLightboxView: View {
         }
         .background(KeyDismissView(onKey: { close() }))
 #endif
+        .macOSSwipeToDismiss { close() }
     }
 
     private func close() {
