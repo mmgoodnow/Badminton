@@ -20,11 +20,18 @@ struct HomeView: View {
                         }
 
                         if viewModel.isLoading && viewModel.trendingMovies.isEmpty && viewModel.trendingTV.isEmpty {
-                            ProgressView("Loading trending titles…")
+                            ProgressView("Loading titles…")
                                 .frame(maxWidth: .infinity, alignment: .center)
                         } else {
                             trendingSection(title: "Trending Movies", items: viewModel.trendingMovies.map { .movie($0) })
                             trendingSection(title: "Trending TV", items: viewModel.trendingTV.map { .tv($0) })
+                            trendingSection(title: "Now Playing", items: viewModel.nowPlayingMovies.map { .movie($0) })
+                            trendingSection(title: "Upcoming", items: viewModel.upcomingMovies.map { .movie($0) })
+                            trendingSection(title: "Top Rated Movies", items: viewModel.topRatedMovies.map { .movie($0) })
+                            trendingSection(title: "On the Air", items: viewModel.onTheAirTV.map { .tv($0) })
+                            trendingSection(title: "Airing Today", items: viewModel.airingTodayTV.map { .tv($0) })
+                            trendingSection(title: "Top Rated TV", items: viewModel.topRatedTV.map { .tv($0) })
+                            peopleSection(title: "Popular People", items: viewModel.popularPeople)
                         }
                     } else {
                         searchResultsSection
@@ -130,6 +137,34 @@ struct HomeView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func peopleSection(title: String, items: [TMDBPersonSummary]) -> some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title)
+                    .font(.title2.bold())
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(items) { person in
+                            NavigationLink {
+                                PersonDetailView(personID: person.id, name: person.name, profilePath: person.profilePath)
+                            } label: {
+                                PersonCardView(
+                                    name: person.name,
+                                    subtitle: person.knownForDepartment ?? "",
+                                    imageURL: viewModel.profileURL(path: person.profilePath)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
 }
 
 private enum HomeMediaItem {
@@ -208,10 +243,51 @@ private struct PosterCardView: View {
     }
 }
 
+private struct PersonCardView: View {
+    let name: String
+    let subtitle: String
+    let imageURL: URL?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.gray.opacity(0.2))
+
+                if let imageURL {
+                    KFImage(imageURL)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .frame(width: 120, height: 160)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+            Text(name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 120, alignment: .leading)
+    }
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var trendingMovies: [TMDBMovieSummary] = []
     @Published var trendingTV: [TMDBTVSeriesSummary] = []
+    @Published var nowPlayingMovies: [TMDBMovieSummary] = []
+    @Published var upcomingMovies: [TMDBMovieSummary] = []
+    @Published var topRatedMovies: [TMDBMovieSummary] = []
+    @Published var onTheAirTV: [TMDBTVSeriesSummary] = []
+    @Published var airingTodayTV: [TMDBTVSeriesSummary] = []
+    @Published var topRatedTV: [TMDBTVSeriesSummary] = []
+    @Published var popularPeople: [TMDBPersonSummary] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -237,11 +313,45 @@ final class HomeViewModel: ObservableObject {
             async let config = client.getImageConfiguration()
             async let movies: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/trending/movie/day")
             async let tv: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/trending/tv/day")
+            async let nowPlaying: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/now_playing")
+            async let upcoming: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/upcoming")
+            async let topRatedMovies: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/top_rated")
+            async let onTheAir: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/on_the_air")
+            async let airingToday: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/airing_today")
+            async let topRatedTV: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/top_rated")
+            async let popularPeople: TMDBPagedResults<TMDBPersonSummary> = client.getV3(path: "/3/person/popular")
 
-            let (configResponse, moviesResponse, tvResponse) = try await (config, movies, tv)
+            let (configResponse,
+                 moviesResponse,
+                 tvResponse,
+                 nowPlayingResponse,
+                 upcomingResponse,
+                 topRatedMoviesResponse,
+                 onTheAirResponse,
+                 airingTodayResponse,
+                 topRatedTVResponse,
+                 popularPeopleResponse) = try await (
+                    config,
+                    movies,
+                    tv,
+                    nowPlaying,
+                    upcoming,
+                    topRatedMovies,
+                    onTheAir,
+                    airingToday,
+                    topRatedTV,
+                    popularPeople
+                 )
             imageConfig = configResponse.images
             trendingMovies = moviesResponse.results
             trendingTV = tvResponse.results
+            nowPlayingMovies = nowPlayingResponse.results
+            upcomingMovies = upcomingResponse.results
+            self.topRatedMovies = topRatedMoviesResponse.results
+            onTheAirTV = onTheAirResponse.results
+            airingTodayTV = airingTodayResponse.results
+            self.topRatedTV = topRatedTVResponse.results
+            self.popularPeople = popularPeopleResponse.results
             hasLoaded = true
         } catch {
             errorMessage = error.localizedDescription
@@ -255,6 +365,14 @@ final class HomeViewModel: ObservableObject {
         let cleanedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let baseURL = imageConfig?.secureBaseUrl ?? "https://image.tmdb.org/t/p/"
         let size = preferredSize(from: imageConfig?.posterSizes, fallback: "w342")
+        return URL(string: baseURL)?.appendingPathComponent(size).appendingPathComponent(cleanedPath)
+    }
+
+    func profileURL(path: String?) -> URL? {
+        guard let path, !path.isEmpty else { return nil }
+        let cleanedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let baseURL = imageConfig?.secureBaseUrl ?? "https://image.tmdb.org/t/p/"
+        let size = preferredSize(from: imageConfig?.profileSizes, fallback: "w185")
         return URL(string: baseURL)?.appendingPathComponent(size).appendingPathComponent(cleanedPath)
     }
 
