@@ -423,7 +423,7 @@ private struct SeasonRow: View {
                         .scaledToFill()
                 }
             }
-            .frame(width: 70, height: 105)
+            .frame(width: 96, height: 144)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
             .highPriorityGesture(
