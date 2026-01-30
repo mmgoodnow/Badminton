@@ -204,30 +204,66 @@ struct TVDetailView: View {
                     HStack(spacing: 16) {
                         if !viewModel.latestEpisodes.isEmpty {
                             ForEach(viewModel.latestEpisodes.prefix(10)) { episode in
+                                if let seasonNumber = viewModel.latestSeasonNumber ?? detail.lastEpisodeToAir?.seasonNumber {
+                                    NavigationLink {
+                                        EpisodeDetailView(
+                                            tvID: tvID,
+                                            seasonNumber: seasonNumber,
+                                            episodeNumber: episode.episodeNumber,
+                                            title: episode.name,
+                                            stillPath: episode.stillPath
+                                        )
+                                    } label: {
+                                        EpisodeCard(
+                                            title: episode.name,
+                                            subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
+                                            overview: episode.overview,
+                                            imageURL: viewModel.stillURL(path: episode.stillPath),
+                                            onImageTap: {
+                                                if let url = viewModel.stillURL(path: episode.stillPath) {
+                                                    showLightbox(url: url, title: episode.name)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    EpisodeCard(
+                                        title: episode.name,
+                                        subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
+                                        overview: episode.overview,
+                                        imageURL: viewModel.stillURL(path: episode.stillPath),
+                                        onImageTap: {
+                                            if let url = viewModel.stillURL(path: episode.stillPath) {
+                                                showLightbox(url: url, title: episode.name)
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        } else if let lastEpisode = detail.lastEpisodeToAir {
+                            NavigationLink {
+                                EpisodeDetailView(
+                                    tvID: tvID,
+                                    seasonNumber: lastEpisode.seasonNumber,
+                                    episodeNumber: lastEpisode.episodeNumber,
+                                    title: lastEpisode.name,
+                                    stillPath: lastEpisode.stillPath
+                                )
+                            } label: {
                                 EpisodeCard(
-                                    title: episode.name,
-                                    subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
-                                    overview: episode.overview,
-                                    imageURL: viewModel.stillURL(path: episode.stillPath),
+                                    title: lastEpisode.name,
+                                    subtitle: episodeSubtitle(lastEpisode),
+                                    overview: lastEpisode.overview,
+                                    imageURL: viewModel.stillURL(path: lastEpisode.stillPath),
                                     onImageTap: {
-                                        if let url = viewModel.stillURL(path: episode.stillPath) {
-                                            showLightbox(url: url, title: episode.name)
+                                        if let url = viewModel.stillURL(path: lastEpisode.stillPath) {
+                                            showLightbox(url: url, title: lastEpisode.name)
                                         }
                                     }
                                 )
                             }
-                        } else if let lastEpisode = detail.lastEpisodeToAir {
-                            EpisodeCard(
-                                title: lastEpisode.name,
-                                subtitle: episodeSubtitle(lastEpisode),
-                                overview: lastEpisode.overview,
-                                imageURL: viewModel.stillURL(path: lastEpisode.stillPath),
-                                onImageTap: {
-                                    if let url = viewModel.stillURL(path: lastEpisode.stillPath) {
-                                        showLightbox(url: url, title: lastEpisode.name)
-                                    }
-                                }
-                            )
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -452,6 +488,7 @@ final class TVDetailViewModel: ObservableObject {
     @Published var detail: TMDBTVSeriesDetail?
     @Published var credits: TMDBCredits?
     @Published private(set) var latestEpisodes: [TMDBEpisode] = []
+    @Published private(set) var latestSeasonNumber: Int?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -490,8 +527,10 @@ final class TVDetailViewModel: ObservableObject {
             self.detail = detailResponse
             self.credits = creditsResponse
             latestEpisodes = []
+            latestSeasonNumber = nil
 
             if let seasonNumber = latestSeasonNumber(from: detailResponse) {
+                latestSeasonNumber = seasonNumber
                 if let seasonDetail: TMDBTVSeasonDetail = try? await client.getV3(path: "/3/tv/\(tvID)/season/\(seasonNumber)") {
                     latestEpisodes = latestEpisodes(from: seasonDetail)
                 }
