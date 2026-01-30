@@ -201,7 +201,7 @@ private struct CastRow: View {
                         .scaledToFill()
                 }
             }
-            .frame(width: 44, height: 66)
+            .frame(width: 72, height: 108)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
             .highPriorityGesture(
