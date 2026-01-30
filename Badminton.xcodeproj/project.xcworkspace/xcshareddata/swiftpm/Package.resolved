@@ -1,5 +1,5 @@
 {
-  "originHash" : "b323b0cc2aa6570db617e36be431ef0c266f9f5da7d059dfa707f8d220e90f5e",
+  "originHash" : "917a2b512148612347b307b5f8d624e74df48af36fa322c80901a86fc0e1317f",
   "pins" : [
     {
       "identity" : "kingfisher",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "2ef543ee21d63734e1c004ad6c870255e8716c50",
         "version" : "7.12.0"
-      }
-    },
-    {
-      "identity" : "zoomable",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ryohey/Zoomable.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "27463744a1c82e550959703153bd6f3c62fef906"
       }
     }
   ],
