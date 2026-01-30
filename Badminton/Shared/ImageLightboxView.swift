@@ -51,10 +51,10 @@ struct ImageLightboxView: View {
         .onTapGesture {
             close()
         }
+#if os(macOS)
         .onExitCommand {
             close()
         }
-#if os(macOS)
         .background(KeyDismissView(onKey: { close() }))
 #endif
     }
