@@ -40,7 +40,7 @@ struct SearchView: View {
                 case .movie:
                     MovieDetailView(movieID: item.id, title: item.displayTitle, posterPath: item.posterPath)
                 case .person:
-                    PlaceholderDetailView(title: item.displayTitle, subtitle: "Person details coming soon.")
+                    PersonDetailView(personID: item.id, name: item.displayTitle, profilePath: item.profilePath)
                 case .unknown:
                     PlaceholderDetailView(title: "Details", subtitle: "Details coming soon.")
                 }
