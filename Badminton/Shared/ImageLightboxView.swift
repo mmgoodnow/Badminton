@@ -1,6 +1,10 @@
 import Kingfisher
 import SwiftUI
 
+#if os(macOS)
+import AppKit
+#endif
+
 struct ImageLightboxItem: Identifiable {
     let id = UUID()
     let url: URL
@@ -11,83 +15,62 @@ struct ImageLightboxView: View {
     let item: ImageLightboxItem
 
     @Environment(\.dismiss) private var dismiss
-    @State private var scale: CGFloat = 1
-    @State private var lastScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
 
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                header
-                Spacer(minLength: 0)
-                imageView
-                Spacer(minLength: 0)
-            }
+            KFImage(item.url)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .ignoresSafeArea()
         }
-    }
-
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text(item.title)
-                .font(.headline)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            Button("Close") {
-                dismiss()
-            }
-            .buttonStyle(.bordered)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            dismiss()
         }
-        .padding()
-    }
-
-    private var imageView: some View {
-        KFImage(item.url)
-            .resizable()
-            .scaledToFit()
-            .scaleEffect(scale)
-            .offset(offset)
-            .gesture(magnificationGesture)
-            .simultaneousGesture(dragGesture)
-            .onTapGesture(count: 2) {
-                withAnimation(.spring()) {
-                    scale = 1
-                    lastScale = 1
-                    offset = .zero
-                    lastOffset = .zero
-                }
-            }
-            .padding()
-    }
-
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                scale = max(1, lastScale * value)
-            }
-            .onEnded { _ in
-                lastScale = scale
-            }
-    }
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard scale > 1 else { return }
-                offset = CGSize(width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height)
-            }
-            .onEnded { _ in
-                if scale <= 1 {
-                    offset = .zero
-                    lastOffset = .zero
-                } else {
-                    lastOffset = offset
-                }
-            }
+        .onExitCommand {
+            dismiss()
+        }
+#if os(macOS)
+        .background(KeyDismissView(onKey: { dismiss() }))
+#endif
     }
 }
+
+#if os(macOS)
+private struct KeyDismissView: NSViewRepresentable {
+    let onKey: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = KeyCatcherView()
+        view.onKey = onKey
+        DispatchQueue.main.async {
+            view.window?.makeFirstResponder(view)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let view = nsView as? KeyCatcherView {
+            view.onKey = onKey
+            DispatchQueue.main.async {
+                view.window?.makeFirstResponder(view)
+            }
+        }
+    }
+}
+
+private final class KeyCatcherView: NSView {
+    var onKey: (() -> Void)?
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        onKey?()
+    }
+}
+#endif
