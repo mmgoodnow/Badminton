@@ -4,11 +4,18 @@ import SwiftUI
 import AppKit
 
 private final class SwipeBackView: NSView {
-    var onSwipe: (CGFloat) -> Void
+    var onSwipe: () -> Void
+    private let recognizer: NSPanGestureRecognizer
 
-    init(onSwipe: @escaping (CGFloat) -> Void) {
+    init(onSwipe: @escaping () -> Void) {
         self.onSwipe = onSwipe
+        self.recognizer = NSPanGestureRecognizer()
         super.init(frame: .zero)
+
+        recognizer.target = self
+        recognizer.action = #selector(handlePan(_:))
+        recognizer.allowedTouchTypes = [.direct, .indirect]
+        addGestureRecognizer(recognizer)
     }
 
     @available(*, unavailable)
@@ -16,13 +23,18 @@ private final class SwipeBackView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func swipe(with event: NSEvent) {
-        onSwipe(event.deltaX)
+    @objc private func handlePan(_ recognizer: NSPanGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        let translation = recognizer.translation(in: self)
+        let isHorizontal = abs(translation.x) > abs(translation.y)
+        if isHorizontal && translation.x > 120 {
+            onSwipe()
+        }
     }
 }
 
 private struct SwipeBackRecognizer: NSViewRepresentable {
-    var onSwipe: (CGFloat) -> Void
+    var onSwipe: () -> Void
 
     func makeNSView(context: Context) -> SwipeBackView {
         SwipeBackView(onSwipe: onSwipe)
@@ -35,11 +47,7 @@ private struct SwipeBackRecognizer: NSViewRepresentable {
 
 extension View {
     func macOSSwipeToDismiss(_ action: @escaping () -> Void) -> some View {
-        background(SwipeBackRecognizer { deltaX in
-            if deltaX > 0 {
-                action()
-            }
-        })
+        background(SwipeBackRecognizer(onSwipe: action))
     }
 }
 #else
