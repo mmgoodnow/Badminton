@@ -1,66 +1,106 @@
-//
-//  ContentView.swift
-//  Badminton
-//
-//  Created by Michael Goodnow on 1/30/26.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @EnvironmentObject private var authManager: TMDBAuthManager
+    @State private var isSigningIn = false
+    @State private var errorMessage: String?
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Badminton")
+                            .font(.largeTitle.bold())
+                        Text("Sign in with TMDB to personalize your experience.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+
+                    GroupBox("Configuration") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
+                            configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
+                            configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
+                            Text("Set these in Badminton/Info.plist.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+
+                    GroupBox("Session") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if authManager.isAuthenticated {
+                                Text("Signed in")
+                                    .font(.headline)
+                                if let accountID = authManager.accountID {
+                                    Text("Account: \(accountID)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Button("Sign Out") {
+                                    Task { await authManager.signOut() }
+                                }
+                            } else {
+                                if isSigningIn {
+                                    ProgressView("Connecting…")
+                                }
+                                Button("Sign in with TMDB") {
+                                    Task { await signIn() }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(!canSignIn)
+                            }
+
+                            if let errorMessage {
+                                Text(errorMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Spacer(minLength: 0)
                 }
+                .padding()
             }
-        } detail: {
-            Text("Select an item")
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+    private func signIn() async {
+        errorMessage = nil
+        isSigningIn = true
+        do {
+            try await authManager.signIn()
+        } catch {
+            errorMessage = error.localizedDescription
         }
+        isSigningIn = false
     }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
+    private var canSignIn: Bool {
+        !TMDBConfig.apiKey.isEmpty && !TMDBConfig.readAccessToken.isEmpty && !TMDBConfig.redirectURI.isEmpty
+    }
+
+    @ViewBuilder
+    private func configRow(title: String, isReady: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isReady ? .green : .orange)
+            Text(title)
+                .font(.subheadline)
+            Spacer()
+            Text(isReady ? "Set" : "Missing")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .environmentObject(TMDBAuthManager())
 }

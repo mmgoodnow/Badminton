@@ -2,6 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>badminton</string>
+			</array>
+		</dict>
+	</array>
+	<key>TMDB_API_KEY</key>
+	<string>$(TMDB_API_KEY)</string>
+	<key>TMDB_AUTH_BASE_URL</key>
+	<string>https://www.themoviedb.org/auth/access</string>
+	<key>TMDB_READ_ACCESS_TOKEN</key>
+	<string>$(TMDB_READ_ACCESS_TOKEN)</string>
+	<key>TMDB_REDIRECT_URI</key>
+	<string>$(TMDB_REDIRECT_URI)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
