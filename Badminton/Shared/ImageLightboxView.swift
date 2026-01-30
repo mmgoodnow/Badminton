@@ -32,8 +32,10 @@ struct ImageLightboxView: View {
                                height: proxy.size.height * scale)
                         .clipped()
                 }
+                .frame(width: proxy.size.width, height: proxy.size.height)
                 .gesture(magnificationGesture)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
         }
         .contentShape(Rectangle())
