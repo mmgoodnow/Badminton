@@ -10,12 +10,7 @@ struct ContentView: View {
         ZStack {
             backgroundView
             if authManager.isAuthenticated {
-                TabView {
-                    HomeView()
-                        .tabItem { Label("Home", systemImage: "sparkles") }
-                    SearchView()
-                        .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                }
+                HomeView()
             } else {
                 authGate
             }

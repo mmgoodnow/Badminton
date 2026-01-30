@@ -32,7 +32,7 @@ struct HomeView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Home")
+            .navigationTitle("Badminton")
             .searchable(text: $searchModel.query, placement: .toolbar, prompt: "Movies, TV, people")
             .navigationDestination(for: TMDBSearchResultItem.self) { item in
                 switch item.mediaType {
@@ -59,7 +59,7 @@ struct HomeView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Home")
+            Text("Badminton")
                 .font(.largeTitle.bold())
         }
     }
