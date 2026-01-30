@@ -176,12 +176,7 @@ struct MovieDetailView: View {
                         } label: {
                             CastRow(
                                 member: member,
-                                imageURL: viewModel.profileURL(path: member.profilePath),
-                                onImageTap: {
-                                    if let url = viewModel.profileURL(path: member.profilePath) {
-                                        showLightbox(url: url, title: member.name)
-                                    }
-                                }
+                                imageURL: viewModel.profileURL(path: member.profilePath)
                             )
                         }
                         .buttonStyle(.plain)
@@ -214,7 +209,6 @@ struct MovieDetailView: View {
 private struct CastRow: View {
     let member: TMDBCastMember
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -229,14 +223,6 @@ private struct CastRow: View {
             }
             .frame(width: 96, height: 144)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(member.name)

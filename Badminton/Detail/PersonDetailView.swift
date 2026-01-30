@@ -149,12 +149,7 @@ struct PersonDetailView: View {
                             let card = CreditCardView(
                                 title: credit.displayTitle,
                                 subtitle: viewModel.creditSubtitle(credit),
-                                imageURL: viewModel.posterURL(path: credit.posterPath),
-                                onImageTap: {
-                                    if let url = viewModel.posterURL(path: credit.posterPath) {
-                                        showLightbox(url: url, title: credit.displayTitle)
-                                    }
-                                }
+                                imageURL: viewModel.posterURL(path: credit.posterPath)
                             )
                             if credit.mediaType == .movie || credit.mediaType == .tv {
                                 NavigationLink(value: credit) {
@@ -186,12 +181,7 @@ struct PersonDetailView: View {
                         let row = CreditRowView(
                             title: credit.displayTitle,
                             subtitle: viewModel.creditSubtitle(credit),
-                            imageURL: viewModel.posterURL(path: credit.posterPath),
-                            onImageTap: {
-                                if let url = viewModel.posterURL(path: credit.posterPath) {
-                                    showLightbox(url: url, title: credit.displayTitle)
-                                }
-                            }
+                            imageURL: viewModel.posterURL(path: credit.posterPath)
                         )
                         if credit.mediaType == .movie || credit.mediaType == .tv {
                             NavigationLink(value: credit) {
@@ -227,7 +217,6 @@ private struct CreditCardView: View {
     let title: String
     let subtitle: String
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -242,14 +231,6 @@ private struct CreditCardView: View {
             }
             .frame(width: 140, height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
@@ -268,7 +249,6 @@ private struct CreditRowView: View {
     let title: String
     let subtitle: String
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -283,14 +263,6 @@ private struct CreditRowView: View {
             }
             .frame(width: 70, height: 105)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)

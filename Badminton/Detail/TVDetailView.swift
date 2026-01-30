@@ -161,12 +161,7 @@ struct TVDetailView: View {
                         } label: {
                             SeasonRow(
                                 season: season,
-                                imageURL: viewModel.posterURL(path: season.posterPath),
-                                onImageTap: {
-                                    if let url = viewModel.posterURL(path: season.posterPath) {
-                                        showLightbox(url: url, title: season.name)
-                                    }
-                                }
+                                imageURL: viewModel.posterURL(path: season.posterPath)
                             )
                         }
                         .buttonStyle(.plain)
@@ -329,12 +324,7 @@ struct TVDetailView: View {
                         } label: {
                             CastRow(
                                 member: member,
-                                imageURL: viewModel.profileURL(path: member.profilePath),
-                                onImageTap: {
-                                    if let url = viewModel.profileURL(path: member.profilePath) {
-                                        showLightbox(url: url, title: member.name)
-                                    }
-                                }
+                                imageURL: viewModel.profileURL(path: member.profilePath)
                             )
                         }
                         .buttonStyle(.plain)
@@ -367,7 +357,6 @@ struct TVDetailView: View {
 private struct CastRow: View {
     let member: TMDBCastMember
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -382,14 +371,6 @@ private struct CastRow: View {
             }
             .frame(width: 96, height: 144)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(member.name)
@@ -410,7 +391,6 @@ private struct CastRow: View {
 private struct SeasonRow: View {
     let season: TMDBTVSeasonSummary
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -425,14 +405,6 @@ private struct SeasonRow: View {
             }
             .frame(width: 96, height: 144)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(season.name)

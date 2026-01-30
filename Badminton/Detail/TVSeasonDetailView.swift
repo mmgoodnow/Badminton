@@ -53,12 +53,7 @@ struct TVSeasonDetailView: View {
                             ForEach(detail.episodes) { episode in
                                 EpisodeRow(
                                     episode: episode,
-                                    imageURL: viewModel.stillURL(path: episode.stillPath),
-                                    onImageTap: {
-                                        if let url = viewModel.stillURL(path: episode.stillPath) {
-                                            showLightbox(url: url, title: episode.name)
-                                        }
-                                    }
+                                    imageURL: viewModel.stillURL(path: episode.stillPath)
                                 )
                                 .contentShape(Rectangle())
                                 .onTapGesture {
@@ -157,7 +152,6 @@ private struct EpisodeRoute: Identifiable, Hashable {
 private struct EpisodeRow: View {
     let episode: TMDBEpisode
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -172,14 +166,6 @@ private struct EpisodeRow: View {
             }
             .frame(width: 90, height: 54)
             .clipShape(RoundedRectangle(cornerRadius: 8))
-            .contentShape(Rectangle())
-            .highPriorityGesture(
-                TapGesture().onEnded {
-                    if imageURL != nil {
-                        onImageTap()
-                    }
-                }
-            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("E\(episode.episodeNumber) · \(episode.name)")
