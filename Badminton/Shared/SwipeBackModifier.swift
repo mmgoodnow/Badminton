@@ -5,16 +5,11 @@ import AppKit
 
 private final class SwipeBackView: NSView {
     var onSwipe: () -> Void
-    private let recognizer: NSPanGestureRecognizer
+    private var monitor: Any?
 
     init(onSwipe: @escaping () -> Void) {
         self.onSwipe = onSwipe
-        self.recognizer = NSPanGestureRecognizer()
         super.init(frame: .zero)
-
-        recognizer.target = self
-        recognizer.action = #selector(handlePan(_:))
-        addGestureRecognizer(recognizer)
     }
 
     @available(*, unavailable)
@@ -22,12 +17,27 @@ private final class SwipeBackView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    @objc private func handlePan(_ recognizer: NSPanGestureRecognizer) {
-        guard recognizer.state == .ended else { return }
-        let translation = recognizer.translation(in: self)
-        let isHorizontal = abs(translation.x) > abs(translation.y)
-        if isHorizontal && translation.x > 120 {
+    override func swipe(with event: NSEvent) {
+        if event.deltaX > 0 {
             onSwipe()
+        }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.swipe]) { [weak self] event in
+            guard let self else { return event }
+            if event.deltaX > 0 {
+                self.onSwipe()
+            }
+            return event
+        }
+    }
+
+    deinit {
+        if let monitor {
+            NSEvent.removeMonitor(monitor)
         }
     }
 }
