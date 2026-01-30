@@ -231,12 +231,7 @@ struct TVDetailView: View {
                                             title: episode.name,
                                             subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
                                             overview: episode.overview,
-                                            imageURL: viewModel.stillURL(path: episode.stillPath),
-                                            onImageTap: {
-                                                if let url = viewModel.stillURL(path: episode.stillPath) {
-                                                    showLightbox(url: url, title: episode.name)
-                                                }
-                                            }
+                                            imageURL: viewModel.stillURL(path: episode.stillPath)
                                         )
                                     }
                                     .buttonStyle(.plain)
@@ -245,12 +240,7 @@ struct TVDetailView: View {
                                         title: episode.name,
                                         subtitle: episodeSubtitle(episode, fallbackSeason: detail.lastEpisodeToAir?.seasonNumber),
                                         overview: episode.overview,
-                                        imageURL: viewModel.stillURL(path: episode.stillPath),
-                                        onImageTap: {
-                                            if let url = viewModel.stillURL(path: episode.stillPath) {
-                                                showLightbox(url: url, title: episode.name)
-                                            }
-                                        }
+                                        imageURL: viewModel.stillURL(path: episode.stillPath)
                                     )
                                 }
                             }
@@ -268,12 +258,7 @@ struct TVDetailView: View {
                                     title: lastEpisode.name,
                                     subtitle: episodeSubtitle(lastEpisode),
                                     overview: lastEpisode.overview,
-                                    imageURL: viewModel.stillURL(path: lastEpisode.stillPath),
-                                    onImageTap: {
-                                        if let url = viewModel.stillURL(path: lastEpisode.stillPath) {
-                                            showLightbox(url: url, title: lastEpisode.name)
-                                        }
-                                    }
+                                    imageURL: viewModel.stillURL(path: lastEpisode.stillPath)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -453,7 +438,6 @@ private struct EpisodeCard: View {
     let subtitle: String
     let overview: String?
     let imageURL: URL?
-    let onImageTap: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -468,12 +452,6 @@ private struct EpisodeCard: View {
             }
             .frame(width: 220, height: 124)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if imageURL != nil {
-                    onImageTap()
-                }
-            }
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
