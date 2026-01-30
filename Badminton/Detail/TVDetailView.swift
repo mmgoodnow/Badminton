@@ -34,6 +34,7 @@ struct TVDetailView: View {
                 } else if let detail = viewModel.detail {
                     overviewSection(detail: detail)
                     infoSection(detail: detail)
+                    latestEpisodeSection(detail: detail)
                     seasonsSection(detail: detail)
                     castSection
                 }
@@ -161,6 +162,46 @@ struct TVDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func latestEpisodeSection(detail: TMDBTVSeriesDetail) -> some View {
+        if detail.lastEpisodeToAir != nil {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Latest episode")
+                    .font(.headline)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        if let lastEpisode = detail.lastEpisodeToAir {
+                            EpisodeCard(
+                                title: lastEpisode.name,
+                                subtitle: episodeSubtitle(lastEpisode),
+                                overview: lastEpisode.overview,
+                                imageURL: viewModel.stillURL(path: lastEpisode.stillPath)
+                            )
+                        }
+                        if let nextEpisode = detail.nextEpisodeToAir {
+                            EpisodeCard(
+                                title: "Up next: \(nextEpisode.name)",
+                                subtitle: episodeSubtitle(nextEpisode),
+                                overview: nextEpisode.overview,
+                                imageURL: viewModel.stillURL(path: nextEpisode.stillPath)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func episodeSubtitle(_ episode: TMDBEpisodeSummary) -> String {
+        var parts: [String] = []
+        parts.append("S\(episode.seasonNumber) · E\(episode.episodeNumber)")
+        if let airDate = episode.airDate, !airDate.isEmpty {
+            parts.append(airDate)
+        }
+        return parts.joined(separator: " • ")
+    }
+
     private var castSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Top Cast")
@@ -264,6 +305,47 @@ private struct SeasonRow: View {
     }
 }
 
+private struct EpisodeCard: View {
+    let title: String
+    let subtitle: String
+    let overview: String?
+    let imageURL: URL?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                if let imageURL {
+                    KFImage(imageURL)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .frame(width: 220, height: 124)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let overview, !overview.isEmpty {
+                Text(overview)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(width: 220, alignment: .leading)
+    }
+}
+
 @MainActor
 final class TVDetailViewModel: ObservableObject {
     @Published var detail: TMDBTVSeriesDetail?
@@ -315,6 +397,10 @@ final class TVDetailViewModel: ObservableObject {
 
     func posterURL(path: String?) -> URL? {
         imageURL(path: path, sizes: imageConfig?.posterSizes, fallback: "w342")
+    }
+
+    func stillURL(path: String?) -> URL? {
+        imageURL(path: path, sizes: imageConfig?.stillSizes, fallback: "w300")
     }
 
     func profileURL(path: String?) -> URL? {

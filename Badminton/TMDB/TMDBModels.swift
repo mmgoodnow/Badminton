@@ -119,6 +119,8 @@ struct TMDBTVSeriesDetail: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let firstAirDate: String?
     let lastAirDate: String?
+    let lastEpisodeToAir: TMDBEpisodeSummary?
+    let nextEpisodeToAir: TMDBEpisodeSummary?
     let numberOfSeasons: Int
     let numberOfEpisodes: Int
     let status: String?
@@ -127,6 +129,19 @@ struct TMDBTVSeriesDetail: Decodable, Identifiable, Hashable {
     let voteCount: Int
     let genres: [TMDBGenre]
     let seasons: [TMDBTVSeasonSummary]
+}
+
+struct TMDBEpisodeSummary: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let airDate: String?
+    let overview: String?
+    let stillPath: String?
+    let voteAverage: Double?
+    let voteCount: Int?
+    let runtime: Int?
 }
 
 struct TMDBTVSeasonSummary: Decodable, Identifiable, Hashable {
