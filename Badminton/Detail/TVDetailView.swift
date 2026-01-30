@@ -178,21 +178,34 @@ struct TVDetailView: View {
     @ViewBuilder
     private func latestEpisodeSection(detail: TMDBTVSeriesDetail) -> some View {
         if let nextEpisode = detail.nextEpisodeToAir {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Up next")
-                    .font(.headline)
-                Text(nextEpisode.name)
-                    .font(.subheadline.weight(.semibold))
-                Text(episodeSubtitle(nextEpisode))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let overview = nextEpisode.overview, !overview.isEmpty {
-                    Text(overview)
+            NavigationLink {
+                EpisodeDetailView(
+                    tvID: tvID,
+                    seasonNumber: nextEpisode.seasonNumber,
+                    episodeNumber: nextEpisode.episodeNumber,
+                    title: nextEpisode.name,
+                    stillPath: nextEpisode.stillPath
+                )
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Up next")
+                        .font(.headline)
+                    Text(nextEpisode.name)
+                        .font(.subheadline.weight(.semibold))
+                    Text(episodeSubtitle(nextEpisode))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                    if let overview = nextEpisode.overview, !overview.isEmpty {
+                        Text(overview)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
 
         if !viewModel.latestEpisodes.isEmpty || detail.lastEpisodeToAir != nil {
