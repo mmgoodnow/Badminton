@@ -27,10 +27,8 @@ struct HomeView: View {
                             trendingSection(title: "Trending TV", items: viewModel.trendingTV.map { .tv($0) })
                             trendingSection(title: "Now Playing", items: viewModel.nowPlayingMovies.map { .movie($0) })
                             trendingSection(title: "Upcoming", items: viewModel.upcomingMovies.map { .movie($0) })
-                            trendingSection(title: "Top Rated Movies", items: viewModel.topRatedMovies.map { .movie($0) })
                             trendingSection(title: "On the Air", items: viewModel.onTheAirTV.map { .tv($0) })
                             trendingSection(title: "Airing Today", items: viewModel.airingTodayTV.map { .tv($0) })
-                            trendingSection(title: "Top Rated TV", items: viewModel.topRatedTV.map { .tv($0) })
                             peopleSection(title: "Popular People", items: viewModel.popularPeople)
                         }
                     } else {
@@ -286,10 +284,8 @@ final class HomeViewModel: ObservableObject {
     @Published var trendingTV: [TMDBTVSeriesSummary] = []
     @Published var nowPlayingMovies: [TMDBMovieSummary] = []
     @Published var upcomingMovies: [TMDBMovieSummary] = []
-    @Published var topRatedMovies: [TMDBMovieSummary] = []
     @Published var onTheAirTV: [TMDBTVSeriesSummary] = []
     @Published var airingTodayTV: [TMDBTVSeriesSummary] = []
-    @Published var topRatedTV: [TMDBTVSeriesSummary] = []
     @Published var popularPeople: [TMDBPersonSummary] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -318,10 +314,8 @@ final class HomeViewModel: ObservableObject {
             async let tv: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/trending/tv/day")
             async let nowPlaying: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/now_playing")
             async let upcoming: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/upcoming")
-            async let topRatedMovies: TMDBPagedResults<TMDBMovieSummary> = client.getV3(path: "/3/movie/top_rated")
             async let onTheAir: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/on_the_air")
             async let airingToday: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/airing_today")
-            async let topRatedTV: TMDBPagedResults<TMDBTVSeriesSummary> = client.getV3(path: "/3/tv/top_rated")
             async let popularPeople: TMDBPagedResults<TMDBPersonSummary> = client.getV3(path: "/3/person/popular")
 
             let (configResponse,
@@ -329,20 +323,16 @@ final class HomeViewModel: ObservableObject {
                  tvResponse,
                  nowPlayingResponse,
                  upcomingResponse,
-                 topRatedMoviesResponse,
                  onTheAirResponse,
                  airingTodayResponse,
-                 topRatedTVResponse,
                  popularPeopleResponse) = try await (
                     config,
                     movies,
                     tv,
                     nowPlaying,
                     upcoming,
-                    topRatedMovies,
                     onTheAir,
                     airingToday,
-                    topRatedTV,
                     popularPeople
                  )
             imageConfig = configResponse.images
@@ -350,10 +340,8 @@ final class HomeViewModel: ObservableObject {
             trendingTV = tvResponse.results
             nowPlayingMovies = nowPlayingResponse.results
             upcomingMovies = upcomingResponse.results
-            self.topRatedMovies = topRatedMoviesResponse.results
             onTheAirTV = onTheAirResponse.results
             airingTodayTV = airingTodayResponse.results
-            self.topRatedTV = topRatedTVResponse.results
             self.popularPeople = popularPeopleResponse.results
             hasLoaded = true
         } catch {
