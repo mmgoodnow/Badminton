@@ -4,7 +4,7 @@ enum PlexConfig {
     static let pinBaseURL = URL(string: "https://plex.tv/api/v2/pins")!
     static let authBaseURL = URL(string: "https://app.plex.tv/auth")!
     static let productName = "Badminton"
-    static let redirectURI = "badminton://plex-auth"
+    static let redirectURI = "badminton://auth/plex"
 
     static var clientIdentifier: String {
         PlexClientIDStore.shared.clientIdentifier
