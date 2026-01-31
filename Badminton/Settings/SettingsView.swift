@@ -23,6 +23,7 @@ struct SettingsView: View {
                             }
                             serverPicker
                             accountPicker
+                            accountAliasEditor
                             Button("Disconnect Plex", role: .destructive) {
                                 plexAuthManager.signOut()
                             }
@@ -118,7 +119,7 @@ struct SettingsView: View {
             Picker("History Account", selection: selection) {
                 Text("All Accounts").tag(Int?.none)
                 ForEach(plexAccounts.accounts) { account in
-                    Text(account.displayName).tag(Optional(account.id))
+                    Text(accountLabel(for: account)).tag(Optional(account.id))
                 }
             }
         } else if let errorMessage = plexAccounts.errorMessage {
@@ -130,6 +131,36 @@ struct SettingsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    @ViewBuilder
+    private var accountAliasEditor: some View {
+        if !plexAccounts.accounts.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Account names")
+                    .font(.callout.weight(.semibold))
+                Text("Give each account a friendly name for the picker.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                ForEach(plexAccounts.accounts) { account in
+                    let binding = Binding<String>(
+                        get: { plexAuthManager.accountAlias(for: account.id) ?? "" },
+                        set: { plexAuthManager.setAccountAlias($0, for: account.id) }
+                    )
+                    TextField("Account \(account.id)", text: binding)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func accountLabel(for account: PlexAccountOption) -> String {
+        if let alias = plexAuthManager.accountAlias(for: account.id), !alias.isEmpty {
+            let suffix = account.count == 1 ? "play" : "plays"
+            return "\(alias) · \(account.count) \(suffix)"
+        }
+        return account.displayName
     }
 }
 
