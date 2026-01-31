@@ -367,6 +367,7 @@ private struct PlexResolveView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
         }
+        .macOSSwipeToDismiss { dismiss() }
         .task {
             await resolve()
         }
