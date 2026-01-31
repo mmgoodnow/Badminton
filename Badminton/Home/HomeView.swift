@@ -114,6 +114,9 @@ struct HomeView: View {
             .refreshable {
                 await viewModel.load(force: true)
             }
+            .focusedSceneValue(\.badmintonRefreshAction) {
+                await viewModel.load(force: true)
+            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }

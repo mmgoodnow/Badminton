@@ -11,5 +11,8 @@ struct BadmintonApp: App {
                 .environmentObject(authManager)
                 .environmentObject(plexAuthManager)
         }
+        .commands {
+            BadmintonRefreshCommands()
+        }
     }
 }

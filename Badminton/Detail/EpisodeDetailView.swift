@@ -64,6 +64,9 @@ struct EpisodeDetailView: View {
         .refreshable {
             await viewModel.load(force: true)
         }
+        .focusedSceneValue(\.badmintonRefreshAction) {
+            await viewModel.load(force: true)
+        }
     }
 
     private var header: some View {
