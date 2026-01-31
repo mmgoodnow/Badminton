@@ -555,7 +555,7 @@ final class TVDetailViewModel: ObservableObject {
 
     func videoURL(for video: TMDBVideo) -> URL? {
         if video.site.lowercased() == "youtube" {
-            return URL(string: "https://www.youtube.com/watch?v=\(video.key)")
+            return URL(string: "https://www.youtube-nocookie.com/embed/\(video.key)?playsinline=1&autoplay=1")
         }
         return nil
     }
