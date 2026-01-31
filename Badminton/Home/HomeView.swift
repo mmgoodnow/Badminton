@@ -8,7 +8,6 @@ struct HomeView: View {
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @State private var showingSettings = false
     @State private var navigationPath = NavigationPath()
-    @State private var resolvingPlexIDs: Set<String> = []
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -105,6 +104,15 @@ struct HomeView: View {
                     )
                 }
             }
+            .navigationDestination(for: PlexRecentlyWatchedItem.self) { item in
+                PlexResolveView(
+                    item: item,
+                    viewModel: viewModel,
+                    searchModel: searchModel,
+                    token: plexAuthManager.authToken,
+                    preferredServerID: plexAuthManager.preferredServerID
+                )
+            }
             .task {
                 await viewModel.load()
             }
@@ -181,9 +189,7 @@ struct HomeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
-                                Button {
-                                    Task { await resolvePlexItem(item) }
-                                } label: {
+                                NavigationLink(value: item) {
                                     PosterCardView(
                                         title: item.title,
                                         subtitle: item.subtitle,
@@ -191,33 +197,11 @@ struct HomeView: View {
                                     )
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(resolvingPlexIDs.contains(item.id))
                             }
                         }
                         .padding(.vertical, 4)
                     }
                 }
-            }
-        }
-    }
-
-    @MainActor
-    private func resolvePlexItem(_ item: PlexRecentlyWatchedItem) async {
-        guard let token = plexAuthManager.authToken, !token.isEmpty else { return }
-        guard !resolvingPlexIDs.contains(item.id) else { return }
-        resolvingPlexIDs.insert(item.id)
-        defer { resolvingPlexIDs.remove(item.id) }
-
-        if let route = await viewModel.resolvePlexRoute(
-            for: item,
-            token: token,
-            preferredServerID: plexAuthManager.preferredServerID
-        ) {
-            navigationPath.append(route)
-        } else {
-            let fallbackQuery = item.seriesTitle ?? item.title
-            await MainActor.run {
-                searchModel.query = fallbackQuery
             }
         }
     }
@@ -324,7 +308,7 @@ private enum HomeMediaItem {
 
 }
 
-struct PlexRecentlyWatchedItem: Identifiable {
+struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let id: String
     let ratingKey: String
     let type: String?
@@ -336,6 +320,74 @@ struct PlexRecentlyWatchedItem: Identifiable {
     let episodeNumber: Int?
     let year: Int?
     let originallyAvailableAt: String?
+}
+
+private struct PlexResolveView: View {
+    let item: PlexRecentlyWatchedItem
+    @ObservedObject var viewModel: HomeViewModel
+    @ObservedObject var searchModel: SearchViewModel
+    let token: String?
+    let preferredServerID: String?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var resolvedRoute: PlexNavigationRoute?
+    @State private var didFail = false
+
+    var body: some View {
+        Group {
+            if let resolvedRoute {
+                switch resolvedRoute {
+                case .movie(let id, let title, let posterPath):
+                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
+                case .tv(let id, let title, let posterPath):
+                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
+                case .episode(let tvID, let seasonNumber, let episodeNumber, let title, _):
+                    EpisodeDetailView(
+                        tvID: tvID,
+                        seasonNumber: seasonNumber,
+                        episodeNumber: episodeNumber,
+                        title: title,
+                        stillPath: nil
+                    )
+                }
+            } else if didFail {
+                VStack(spacing: 12) {
+                    Text("Couldn’t resolve this Plex item.")
+                        .font(.headline)
+                    Button("Search TMDB") {
+                        let fallbackQuery = item.seriesTitle ?? item.title
+                        searchModel.query = fallbackQuery
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            } else {
+                ProgressView("Resolving Plex item…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
+        }
+        .task {
+            await resolve()
+        }
+    }
+
+    private func resolve() async {
+        guard resolvedRoute == nil, !didFail else { return }
+        guard let token, !token.isEmpty else {
+            didFail = true
+            return
+        }
+        if let route = await viewModel.resolvePlexRoute(
+            for: item,
+            token: token,
+            preferredServerID: preferredServerID
+        ) {
+            resolvedRoute = route
+        } else {
+            didFail = true
+        }
+    }
 }
 
 enum PlexNavigationRoute: Hashable {
@@ -533,9 +585,13 @@ final class HomeViewModel: ObservableObject {
                 guard let accountID = item.accountID else { return false }
                 return preferredAccountIDs.contains(accountID)
             }
+            var seenRatingKeys = Set<String>()
+            let uniqueFilteredItems = filteredItems.filter { seenRatingKeys.insert($0.id).inserted }
+            var seenNowPlaying = Set<String>()
+            let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
 
             var nowPlayingSourceIDs: Set<String> = []
-            let nowPlayingMapped: [PlexRecentlyWatchedItem] = nowPlayingItems.compactMap { item in
+            let nowPlayingMapped: [PlexRecentlyWatchedItem] = uniqueNowPlayingItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
@@ -556,7 +612,7 @@ final class HomeViewModel: ObservableObject {
                 )
             }
 
-            let recentMapped: [PlexRecentlyWatchedItem] = filteredItems.compactMap { item in
+            let recentMapped: [PlexRecentlyWatchedItem] = uniqueFilteredItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
