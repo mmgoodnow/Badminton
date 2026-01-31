@@ -336,6 +336,22 @@ private struct PlexResolveView: View {
                 VStack(spacing: 12) {
                     Text("Couldn’t resolve this Plex item.")
                         .font(.headline)
+                    VStack(spacing: 4) {
+                        Text(item.title)
+                            .font(.subheadline.weight(.semibold))
+                        if !item.subtitle.isEmpty {
+                            Text(item.subtitle)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(unresolvedDetailLine)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .multilineTextAlignment(.center)
+                    Text("Try searching TMDB or check the Plex metadata.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Button("Search TMDB") {
                         let fallbackQuery = item.seriesTitle ?? item.title
                         searchModel.query = fallbackQuery
@@ -370,6 +386,23 @@ private struct PlexResolveView: View {
         } else {
             didFail = true
         }
+    }
+
+    private var unresolvedDetailLine: String {
+        var parts: [String] = []
+        if let seriesTitle = item.seriesTitle {
+            parts.append(seriesTitle)
+        }
+        if let season = item.seasonNumber, let episode = item.episodeNumber {
+            parts.append("S\(season)E\(episode)")
+        }
+        if let year = item.year {
+            parts.append(String(year))
+        }
+        if parts.isEmpty {
+            return "No additional metadata available."
+        }
+        return parts.joined(separator: " • ")
     }
 }
 
