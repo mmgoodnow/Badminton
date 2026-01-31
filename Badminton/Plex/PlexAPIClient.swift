@@ -9,7 +9,7 @@ final class PlexAPIClient {
 
     func fetchRecentlyWatched(token: String, size: Int = 20, preferredServerID: String? = nil) async throws -> PlexHistoryResult {
         let result = try await requestHistoryData(token: token, size: size, preferredServerID: preferredServerID)
-        let items = try await parseHistoryItems(from: result.data)
+        let items = try await parseHistoryItems(from: result.data, limit: size)
         return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
     }
 
@@ -116,10 +116,12 @@ final class PlexAPIClient {
         let serverToken = server.accessToken ?? token
         let serverURL = server.baseURL
         let start = 0
+        let oneWeekAgo = Int(Date().addingTimeInterval(-7 * 24 * 60 * 60).timeIntervalSince1970)
 
         var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
         components?.queryItems = [
             URLQueryItem(name: "sort", value: "viewedAt:desc"),
+            URLQueryItem(name: "viewedAt", value: "viewedAt>=\(oneWeekAgo)"),
             URLQueryItem(name: "X-Plex-Container-Start", value: "\(start)"),
             URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
             URLQueryItem(name: "X-Plex-Token", value: serverToken),
@@ -143,7 +145,7 @@ final class PlexAPIClient {
         return (data, http, serverURL, serverToken)
     }
 
-    private func parseHistoryItems(from data: Data) async throws -> [PlexHistoryItem] {
+    private func parseHistoryItems(from data: Data, limit: Int) async throws -> [PlexHistoryItem] {
         try await Task.detached(priority: .userInitiated) {
             let decoder = JSONDecoder()
             let response = try decoder.decode(PlexHistoryResponse.self, from: data)
