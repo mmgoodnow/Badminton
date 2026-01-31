@@ -160,6 +160,10 @@ struct SettingsView: View {
             let suffix = account.count == 1 ? "play" : "plays"
             return "\(alias) · \(account.count) \(suffix)"
         }
+        if let name = plexAccounts.name(for: account.id) {
+            let suffix = account.count == 1 ? "play" : "plays"
+            return "\(name) · \(account.count) \(suffix)"
+        }
         return account.displayName
     }
 }

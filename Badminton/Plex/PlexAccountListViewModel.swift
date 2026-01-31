@@ -17,6 +17,7 @@ final class PlexAccountListViewModel: ObservableObject {
     @Published var accounts: [PlexAccountOption] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var homeUsers: [Int: PlexHomeUser] = [:]
 
     private let client: PlexAPIClient
     private var lastToken: String?
@@ -29,6 +30,7 @@ final class PlexAccountListViewModel: ObservableObject {
     func load(token: String?, preferredServerID: String?, force: Bool = false) async {
         guard let token, !token.isEmpty else {
             accounts = []
+            homeUsers = [:]
             lastToken = nil
             lastServerID = nil
             return
@@ -44,6 +46,12 @@ final class PlexAccountListViewModel: ObservableObject {
                 size: 500,
                 preferredServerID: preferredServerID
             )
+            do {
+                let users = try await client.fetchHomeUsers(token: token)
+                homeUsers = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
+            } catch {
+                homeUsers = [:]
+            }
             var counts: [Int: (count: Int, lastViewedAt: Int?)] = [:]
             for item in result.items {
                 guard let accountID = item.accountID else { continue }
@@ -66,8 +74,14 @@ final class PlexAccountListViewModel: ObservableObject {
             lastServerID = preferredServerID
         } catch {
             accounts = []
+            homeUsers = [:]
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    func name(for id: Int?) -> String? {
+        guard let id else { return nil }
+        return homeUsers[id]?.displayName
     }
 }

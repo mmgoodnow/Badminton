@@ -39,6 +39,26 @@ final class PlexAPIClient {
             }
     }
 
+    func fetchHomeUsers(token: String) async throws -> [PlexHomeUser] {
+        var components = URLComponents(string: "https://plex.tv/api/v2/home/users")
+        components?.queryItems = [
+            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
+            URLQueryItem(name: "X-Plex-Token", value: token)
+        ]
+        let url = components?.url ?? URL(string: "https://plex.tv/api/v2/home/users")!
+        var request = URLRequest(url: url)
+        request.setValue("application/xml", forHTTPHeaderField: "Accept")
+        request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return PlexHomeUsersXMLParser.parse(data: data)
+    }
+
     func fetchResourcesRaw(token: String) async throws -> PlexResourcesRawResult {
         let (data, response) = try await requestResourcesData(token: token)
         return PlexResourcesRawResult(data: data, response: response)
