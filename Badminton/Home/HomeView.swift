@@ -143,8 +143,8 @@ struct HomeView: View {
                         HStack(spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
                                 PosterCardView(
-                                    title: item.displayTitle,
-                                    subtitle: item.displaySubtitle,
+                                    title: item.title,
+                                    subtitle: item.subtitle,
                                     imageURL: item.imageURL
                                 )
                             }
@@ -258,6 +258,13 @@ private enum HomeMediaItem {
 
 }
 
+struct PlexRecentlyWatchedItem: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let imageURL: URL
+}
+
 private struct PosterCardView: View {
     let title: String
     let subtitle: String
@@ -335,7 +342,7 @@ final class HomeViewModel: ObservableObject {
     @Published var onTheAirTV: [TMDBTVSeriesSummary] = []
     @Published var airingTodayTV: [TMDBTVSeriesSummary] = []
     @Published var popularPeople: [TMDBPersonSummary] = []
-    @Published var plexRecentlyWatched: [PlexHistoryItem] = []
+    @Published var plexRecentlyWatched: [PlexRecentlyWatchedItem] = []
     @Published var plexIsLoading = false
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -415,7 +422,18 @@ final class HomeViewModel: ObservableObject {
 
         plexIsLoading = true
         do {
-            plexRecentlyWatched = try await plexClient.fetchHistory(token: token, size: 20)
+            let result = try await plexClient.fetchRecentlyWatched(token: token, size: 20)
+            plexRecentlyWatched = result.items.compactMap { item in
+                guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
+                    return nil
+                }
+                return PlexRecentlyWatchedItem(
+                    id: item.id,
+                    title: item.displayTitle,
+                    subtitle: item.displaySubtitle,
+                    imageURL: imageURL
+                )
+            }
             plexTokenLoaded = token
         } catch {
             plexRecentlyWatched = []

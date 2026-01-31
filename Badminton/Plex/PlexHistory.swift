@@ -120,6 +120,23 @@ struct PlexHistoryItem: Decodable, Identifiable {
         return PlexHistoryItem.resolveURL(path: candidate)
     }
 
+    func imageURL(serverBaseURL: URL, token: String) -> URL? {
+        guard var path = thumb ?? grandparentThumb ?? parentThumb, !path.isEmpty else { return nil }
+        if path.hasPrefix("/") {
+            path.removeFirst()
+        }
+        var url = serverBaseURL.appendingPathComponent(path)
+        if var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            var queryItems = components.queryItems ?? []
+            queryItems.append(URLQueryItem(name: "X-Plex-Token", value: token))
+            components.queryItems = queryItems
+            if let resolved = components.url {
+                url = resolved
+            }
+        }
+        return url
+    }
+
     private static func resolveURL(path: String?) -> URL? {
         guard var path, !path.isEmpty else { return nil }
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
