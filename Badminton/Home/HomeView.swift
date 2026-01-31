@@ -7,9 +7,11 @@ struct HomeView: View {
     @StateObject private var searchModel = SearchViewModel()
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @State private var showingSettings = false
+    @State private var navigationPath = NavigationPath()
+    @State private var resolvingPlexIDs: Set<String> = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     plexRecentlyWatchedSection
@@ -85,6 +87,22 @@ struct HomeView: View {
                     Text("Details coming soon.")
                         .font(.headline)
                         .foregroundStyle(.secondary)
+                }
+            }
+            .navigationDestination(for: PlexNavigationRoute.self) { route in
+                switch route {
+                case .movie(let id, let title, let posterPath):
+                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
+                case .tv(let id, let title, let posterPath):
+                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
+                case .episode(let tvID, let seasonNumber, let episodeNumber, let title, _):
+                    EpisodeDetailView(
+                        tvID: tvID,
+                        seasonNumber: seasonNumber,
+                        episodeNumber: episodeNumber,
+                        title: title,
+                        stillPath: nil
+                    )
                 }
             }
             .task {
@@ -163,16 +181,42 @@ struct HomeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
-                                PosterCardView(
-                                    title: item.title,
-                                    subtitle: item.subtitle,
-                                    imageURL: item.imageURL
-                                )
+                                Button {
+                                    Task { await resolvePlexItem(item) }
+                                } label: {
+                                    PosterCardView(
+                                        title: item.title,
+                                        subtitle: item.subtitle,
+                                        imageURL: item.imageURL
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(resolvingPlexIDs.contains(item.id))
                             }
                         }
                         .padding(.vertical, 4)
                     }
                 }
+            }
+        }
+    }
+
+    @MainActor
+    private func resolvePlexItem(_ item: PlexRecentlyWatchedItem) async {
+        guard let token = plexAuthManager.authToken, !token.isEmpty else { return }
+        guard !resolvingPlexIDs.contains(item.id) else { return }
+        resolvingPlexIDs.insert(item.id)
+        defer { resolvingPlexIDs.remove(item.id) }
+
+        if let route = await viewModel.resolvePlexRoute(
+            for: item,
+            token: token,
+            preferredServerID: plexAuthManager.preferredServerID
+        ) {
+            navigationPath.append(route)
+        } else {
+            await MainActor.run {
+                searchModel.query = item.title
             }
         }
     }
@@ -281,9 +325,28 @@ private enum HomeMediaItem {
 
 struct PlexRecentlyWatchedItem: Identifiable {
     let id: String
+    let ratingKey: String
+    let type: String?
     let title: String
     let subtitle: String
     let imageURL: URL
+    let seriesTitle: String?
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+    let year: Int?
+    let originallyAvailableAt: String?
+}
+
+enum PlexNavigationRoute: Hashable {
+    case movie(id: Int, title: String?, posterPath: String?)
+    case tv(id: Int, title: String?, posterPath: String?)
+    case episode(tvID: Int, seasonNumber: Int, episodeNumber: Int, title: String?, stillPath: String?)
+}
+
+private struct PlexExternalIDs {
+    var tmdbID: Int?
+    var imdbID: String?
+    var tvdbID: String?
 }
 
 private struct PosterCardView: View {
@@ -375,6 +438,7 @@ final class HomeViewModel: ObservableObject {
     private var plexTokenLoaded: String?
     private var plexPreferredServerLoaded: String?
     private var plexPreferredAccountLoaded: Set<Int> = []
+    private var plexRouteCache: [String: PlexNavigationRoute] = [:]
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -478,9 +542,16 @@ final class HomeViewModel: ObservableObject {
                 let subtitle = item.displaySubtitle.isEmpty ? "Now Playing" : "Now Playing • \(item.displaySubtitle)"
                 return PlexRecentlyWatchedItem(
                     id: "now-\(item.id)",
+                    ratingKey: item.id,
+                    type: item.type,
                     title: item.displayTitle,
                     subtitle: subtitle,
-                    imageURL: imageURL
+                    imageURL: imageURL,
+                    seriesTitle: item.grandparentTitle,
+                    seasonNumber: item.parentIndex,
+                    episodeNumber: item.index,
+                    year: item.year,
+                    originallyAvailableAt: item.originallyAvailableAt
                 )
             }
 
@@ -490,9 +561,16 @@ final class HomeViewModel: ObservableObject {
                 }
                 return PlexRecentlyWatchedItem(
                     id: item.id,
+                    ratingKey: item.id,
+                    type: item.type,
                     title: item.displayTitle,
                     subtitle: item.displaySubtitle,
-                    imageURL: imageURL
+                    imageURL: imageURL,
+                    seriesTitle: item.grandparentTitle,
+                    seasonNumber: item.parentIndex,
+                    episodeNumber: item.index,
+                    year: item.year,
+                    originallyAvailableAt: item.originallyAvailableAt
                 )
             }
             plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
@@ -504,6 +582,187 @@ final class HomeViewModel: ObservableObject {
             print("Plex history error: \(error)")
         }
         plexIsLoading = false
+    }
+
+    func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexNavigationRoute? {
+        if let cached = plexRouteCache[item.ratingKey] {
+            return cached
+        }
+
+        let metadata = try? await plexClient.fetchMetadata(
+            ratingKey: item.ratingKey,
+            token: token,
+            preferredServerID: preferredServerID
+        )
+        let typeHint = (metadata?.type ?? item.type)?.lowercased()
+        var guidValues: [String] = []
+        if let guid = metadata?.guid {
+            guidValues.append(guid)
+        }
+        if let guids = metadata?.guids {
+            guidValues.append(contentsOf: guids.map(\.id))
+        }
+
+        if let route = try? await resolveViaGuids(
+            guidValues,
+            typeHint: typeHint,
+            item: item
+        ) {
+            plexRouteCache[item.ratingKey] = route
+            return route
+        }
+
+        if let route = try? await resolveViaSearch(typeHint: typeHint, item: item) {
+            plexRouteCache[item.ratingKey] = route
+            return route
+        }
+
+        return nil
+    }
+
+    private func resolveViaGuids(
+        _ guids: [String],
+        typeHint: String?,
+        item: PlexRecentlyWatchedItem
+    ) async throws -> PlexNavigationRoute? {
+        let parsed = parseExternalIDs(from: guids)
+        if let tmdbID = parsed.tmdbID {
+            if typeHint == "movie" {
+                return .movie(id: tmdbID, title: item.title, posterPath: nil)
+            }
+            if typeHint == "episode",
+               let seasonNumber = item.seasonNumber,
+               let episodeNumber = item.episodeNumber {
+                return .episode(tvID: tmdbID, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
+            }
+            return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
+        }
+
+        if let imdbID = parsed.imdbID {
+            if let route = try await resolveWithFind(externalID: imdbID, source: "imdb_id", typeHint: typeHint, item: item) {
+                return route
+            }
+        }
+
+        if let tvdbID = parsed.tvdbID {
+            if let route = try await resolveWithFind(externalID: tvdbID, source: "tvdb_id", typeHint: typeHint, item: item) {
+                return route
+            }
+        }
+
+        return nil
+    }
+
+    private func resolveWithFind(
+        externalID: String,
+        source: String,
+        typeHint: String?,
+        item: PlexRecentlyWatchedItem
+    ) async throws -> PlexNavigationRoute? {
+        let response: TMDBFindResponse = try await client.getV3(
+            path: "/3/find/\(externalID)",
+            queryItems: [URLQueryItem(name: "external_source", value: source)]
+        )
+        if typeHint == "movie", let movie = response.movieResults.first {
+            return .movie(id: movie.id, title: movie.title, posterPath: movie.posterPath)
+        }
+        if let tv = response.tvResults.first {
+            if typeHint == "episode",
+               let seasonNumber = item.seasonNumber,
+               let episodeNumber = item.episodeNumber {
+                return .episode(tvID: tv.id, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
+            }
+            return .tv(id: tv.id, title: tv.name, posterPath: tv.posterPath)
+        }
+        return nil
+    }
+
+    private func resolveViaSearch(typeHint: String?, item: PlexRecentlyWatchedItem) async throws -> PlexNavigationRoute? {
+        if typeHint == "movie" {
+            let response: TMDBPagedResults<TMDBMovieSummary> = try await client.getV3(
+                path: "/3/search/movie",
+                queryItems: movieSearchQueryItems(title: item.title, year: item.year)
+            )
+            if let movie = response.results.first {
+                return .movie(id: movie.id, title: movie.title, posterPath: movie.posterPath)
+            }
+            return nil
+        }
+
+        let query = item.seriesTitle ?? item.title
+        let response: TMDBPagedResults<TMDBTVSeriesSummary> = try await client.getV3(
+            path: "/3/search/tv",
+            queryItems: tvSearchQueryItems(title: query, year: inferredYear(from: item))
+        )
+        guard let tv = response.results.first else { return nil }
+        if typeHint == "episode",
+           let seasonNumber = item.seasonNumber,
+           let episodeNumber = item.episodeNumber {
+            return .episode(tvID: tv.id, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
+        }
+        return .tv(id: tv.id, title: tv.name, posterPath: tv.posterPath)
+    }
+
+    private func inferredYear(from item: PlexRecentlyWatchedItem) -> Int? {
+        if let year = item.year { return year }
+        return parseYear(from: item.originallyAvailableAt)
+    }
+
+    private func movieSearchQueryItems(title: String, year: Int?) -> [URLQueryItem] {
+        var items = [
+            URLQueryItem(name: "query", value: title),
+            URLQueryItem(name: "include_adult", value: "false")
+        ]
+        if let year {
+            items.append(URLQueryItem(name: "year", value: String(year)))
+        }
+        return items
+    }
+
+    private func tvSearchQueryItems(title: String, year: Int?) -> [URLQueryItem] {
+        var items = [
+            URLQueryItem(name: "query", value: title),
+            URLQueryItem(name: "include_adult", value: "false")
+        ]
+        if let year {
+            items.append(URLQueryItem(name: "first_air_date_year", value: String(year)))
+        }
+        return items
+    }
+
+    private func parseExternalIDs(from guids: [String]) -> PlexExternalIDs {
+        var result = PlexExternalIDs()
+        for guid in guids {
+            if let tmdbID = extractExternalID(from: guid, prefixes: ["com.plexapp.agents.themoviedb://", "themoviedb://", "tmdb://"]) {
+                result.tmdbID = Int(tmdbID)
+            } else if let imdbID = extractExternalID(from: guid, prefixes: ["imdb://", "com.plexapp.agents.imdb://"]) {
+                result.imdbID = imdbID
+            } else if let tvdbID = extractExternalID(from: guid, prefixes: ["thetvdb://", "tvdb://", "com.plexapp.agents.thetvdb://"]) {
+                result.tvdbID = tvdbID
+            }
+        }
+        return result
+    }
+
+    private func extractExternalID(from guid: String, prefixes: [String]) -> String? {
+        let lower = guid.lowercased()
+        for prefix in prefixes {
+            if let range = lower.range(of: prefix) {
+                let original = lower[range.upperBound...]
+                let trimmed = original.split(separator: "?").first ?? original[...]
+                let value = trimmed.split(separator: "/").first.map(String.init) ?? String(trimmed)
+                if !value.isEmpty {
+                    return value
+                }
+            }
+        }
+        return nil
+    }
+
+    private func parseYear(from dateString: String?) -> Int? {
+        guard let dateString, dateString.count >= 4 else { return nil }
+        let prefix = dateString.prefix(4)
+        return Int(prefix)
     }
 
     func posterURL(path: String?) -> URL? {

@@ -29,6 +29,12 @@ final class PlexAPIClient {
         )
     }
 
+    func fetchMetadata(ratingKey: String, token: String, preferredServerID: String? = nil) async throws -> PlexMetadataItem? {
+        let result = try await requestMetadataData(ratingKey: ratingKey, token: token, preferredServerID: preferredServerID)
+        let response = try JSONDecoder().decode(PlexMetadataResponse.self, from: result.data)
+        return response.items.first
+    }
+
     func fetchServers(token: String) async throws -> [PlexServer] {
         let response = try await fetchResources(token: token)
         return response.devices
@@ -172,6 +178,35 @@ final class PlexAPIClient {
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
         request.setValue("\(start)", forHTTPHeaderField: "X-Plex-Container-Start")
         request.setValue("\(size)", forHTTPHeaderField: "X-Plex-Container-Size")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return (data, http, serverURL, serverToken)
+    }
+
+    private func requestMetadataData(ratingKey: String, token: String, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
+        let resourceResponse = try await fetchResources(token: token)
+        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
+            throw URLError(.cannotFindHost)
+        }
+
+        let serverToken = server.accessToken ?? token
+        let serverURL = server.baseURL
+        var components = URLComponents(url: serverURL.appendingPathComponent("library/metadata/\(ratingKey)"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "X-Plex-Token", value: serverToken),
+            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
+            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
+        ]
+        let url = components?.url ?? serverURL.appendingPathComponent("library/metadata/\(ratingKey)")
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

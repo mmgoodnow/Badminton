@@ -31,6 +31,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let index: Int?
     let parentIndex: Int?
     let year: Int?
+    let originallyAvailableAt: String?
     let viewedAt: Int?
     let accountID: Int?
     let thumb: String?
@@ -48,6 +49,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case index
         case parentIndex
         case year
+        case originallyAvailableAt
         case viewedAt
         case accountID
         case thumb
@@ -71,6 +73,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         index = try? container.decode(Int.self, forKey: .index)
         parentIndex = try? container.decode(Int.self, forKey: .parentIndex)
         year = try? container.decode(Int.self, forKey: .year)
+        originallyAvailableAt = try? container.decode(String.self, forKey: .originallyAvailableAt)
         if let viewedAt = try? container.decode(Int.self, forKey: .viewedAt) {
             self.viewedAt = viewedAt
         } else if let viewedAtString = try? container.decode(String.self, forKey: .viewedAt) {
@@ -153,4 +156,56 @@ struct PlexHistoryItem: Decodable, Identifiable {
         return URL(string: "https://metadata-static.plex.tv")?
             .appendingPathComponent(path)
     }
+}
+
+struct PlexMetadataResponse: Decodable {
+    let items: [PlexMetadataItem]
+
+    private enum CodingKeys: String, CodingKey {
+        case mediaContainer = "MediaContainer"
+    }
+
+    private struct MediaContainer: Decodable {
+        let metadata: [PlexMetadataItem]?
+
+        private enum CodingKeys: String, CodingKey {
+            case metadata = "Metadata"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let mediaContainer = try container.decode(MediaContainer.self, forKey: .mediaContainer)
+        items = mediaContainer.metadata ?? []
+    }
+}
+
+struct PlexMetadataItem: Decodable {
+    let ratingKey: String?
+    let guid: String?
+    let type: String?
+    let title: String?
+    let grandparentTitle: String?
+    let parentIndex: Int?
+    let index: Int?
+    let year: Int?
+    let originallyAvailableAt: String?
+    let guids: [PlexMetadataGuid]?
+
+    private enum CodingKeys: String, CodingKey {
+        case ratingKey
+        case guid
+        case type
+        case title
+        case grandparentTitle
+        case parentIndex
+        case index
+        case year
+        case originallyAvailableAt
+        case guids = "Guid"
+    }
+}
+
+struct PlexMetadataGuid: Decodable {
+    let id: String
 }
