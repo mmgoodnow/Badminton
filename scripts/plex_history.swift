@@ -1,0 +1,79 @@
+import Foundation
+
+@main
+struct PlexHistoryCLI {
+    static func main() async {
+        let args = Array(CommandLine.arguments.dropFirst())
+        var token: String?
+        var size = 20
+        var jsonOutput = false
+
+        var i = 0
+        while i < args.count {
+            switch args[i] {
+            case "--token":
+                if i + 1 < args.count {
+                    token = args[i + 1]
+                    i += 1
+                }
+            case "--size":
+                if i + 1 < args.count {
+                    size = Int(args[i + 1]) ?? size
+                    i += 1
+                }
+            case "--json":
+                jsonOutput = true
+            case "-h", "--help":
+                printUsage()
+                return
+            default:
+                break
+            }
+            i += 1
+        }
+
+        let envToken = ProcessInfo.processInfo.environment["PLEX_TOKEN"]
+        guard let authToken = token ?? envToken, !authToken.isEmpty else {
+            print("Missing Plex token. Use --token or set PLEX_TOKEN.")
+            printUsage()
+            return
+        }
+
+        let client = PlexAPIClient()
+        do {
+            let result = try await client.fetchRecentlyWatched(token: authToken, size: size)
+            if jsonOutput {
+                let payload = result.items.map { item in
+                    [
+                        "id": item.id,
+                        "type": item.type,
+                        "title": item.displayTitle,
+                        "subtitle": item.displaySubtitle,
+                        "year": item.year as Any,
+                        "thumb": item.thumb as Any
+                    ]
+                }
+                let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted])
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print(jsonString)
+                }
+            } else {
+                print("Server: \(result.serverBaseURL.absoluteString)")
+                for item in result.items {
+                    let subtitle = item.displaySubtitle.isEmpty ? "" : " — \(item.displaySubtitle)"
+                    print("• \(item.displayTitle)\(subtitle)")
+                }
+            }
+        } catch {
+            print("Plex history error: \(error)")
+        }
+    }
+
+    private static func printUsage() {
+        print("Usage:\n  swift scripts/plex_history.swift \\")
+        print("    Badminton/Plex/PlexAPIClient.swift \\")
+        print("    Badminton/Plex/PlexHistory.swift \\")
+        print("    Badminton/Plex/PlexConfig.swift \\")
+        print("    --token <PLEX_TOKEN> [--size N] [--json]\n")
+    }
+}
