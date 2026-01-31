@@ -19,7 +19,10 @@ final class PlexAPIClient {
         var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
         components?.queryItems = [
             URLQueryItem(name: "sort", value: "viewedAt:desc"),
-            URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)")
+            URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
+            URLQueryItem(name: "X-Plex-Token", value: serverToken),
+            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
+            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
         ]
         let url = components?.url ?? serverURL.appendingPathComponent("status/sessions/history/all")
         var request = URLRequest(url: url)
@@ -32,7 +35,7 @@ final class PlexAPIClient {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        let items = try JSONDecoder().decode(PlexHistoryResponse.self, from: data).items
+        let items = try parseHistoryItems(from: data)
         return PlexHistoryResult(items: items, serverBaseURL: serverURL, serverToken: serverToken)
     }
 
@@ -80,6 +83,17 @@ final class PlexAPIClient {
             return preferred.uri
         }
         return candidates.first(where: { $0.uri != nil })?.uri
+    }
+
+    private func parseHistoryItems(from data: Data) throws -> [PlexHistoryItem] {
+        do {
+            return try PlexHistoryParser.parseJSON(data)
+        } catch {
+            if let items = PlexHistoryParser.parseXML(data) {
+                return items
+            }
+            throw error
+        }
     }
 }
 

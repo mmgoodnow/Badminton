@@ -85,6 +85,27 @@ struct PlexHistoryItem: Decodable, Identifiable {
         grandparentThumb = try? container.decode(String.self, forKey: .grandparentThumb)
     }
 
+    init(attributes: [String: String]) {
+        if let ratingKey = attributes["ratingKey"] {
+            id = ratingKey
+        } else if let rawID = attributes["id"] {
+            id = rawID
+        } else {
+            id = UUID().uuidString
+        }
+
+        type = attributes["type"] ?? "unknown"
+        title = attributes["title"] ?? ""
+        grandparentTitle = attributes["grandparentTitle"]
+        parentTitle = attributes["parentTitle"]
+        index = Int(attributes["index"] ?? "")
+        parentIndex = Int(attributes["parentIndex"] ?? "")
+        year = Int(attributes["year"] ?? "")
+        thumb = attributes["thumb"]
+        parentThumb = attributes["parentThumb"]
+        grandparentThumb = attributes["grandparentThumb"]
+    }
+
     var displayTitle: String {
         switch type.lowercased() {
         case "episode":
@@ -147,5 +168,35 @@ struct PlexHistoryItem: Decodable, Identifiable {
         }
         return URL(string: "https://metadata-static.plex.tv")?
             .appendingPathComponent(path)
+    }
+}
+
+enum PlexHistoryParser {
+    static func parseJSON(_ data: Data) throws -> [PlexHistoryItem] {
+        try JSONDecoder().decode(PlexHistoryResponse.self, from: data).items
+    }
+
+    static func parseXML(_ data: Data) -> [PlexHistoryItem]? {
+        let parser = XMLParser(data: data)
+        let delegate = PlexHistoryXMLParser()
+        parser.delegate = delegate
+        guard parser.parse() else { return nil }
+        return delegate.items
+    }
+}
+
+private final class PlexHistoryXMLParser: NSObject, XMLParserDelegate {
+    var items: [PlexHistoryItem] = []
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String]
+    ) {
+        if elementName == "Metadata" {
+            items.append(PlexHistoryItem(attributes: attributeDict))
+        }
     }
 }
