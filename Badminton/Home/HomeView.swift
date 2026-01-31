@@ -7,10 +7,9 @@ struct HomeView: View {
     @StateObject private var searchModel = SearchViewModel()
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @State private var showingSettings = false
-    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     plexRecentlyWatchedSection
@@ -88,31 +87,6 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationDestination(for: PlexNavigationRoute.self) { route in
-                switch route {
-                case .movie(let id, let title, let posterPath):
-                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
-                case .tv(let id, let title, let posterPath):
-                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
-                case .episode(let tvID, let seasonNumber, let episodeNumber, let title, _):
-                    EpisodeDetailView(
-                        tvID: tvID,
-                        seasonNumber: seasonNumber,
-                        episodeNumber: episodeNumber,
-                        title: title,
-                        stillPath: nil
-                    )
-                }
-            }
-            .navigationDestination(for: PlexRecentlyWatchedItem.self) { item in
-                PlexResolveView(
-                    item: item,
-                    viewModel: viewModel,
-                    searchModel: searchModel,
-                    token: plexAuthManager.authToken,
-                    preferredServerID: plexAuthManager.preferredServerID
-                )
-            }
             .task {
                 await viewModel.load()
             }
@@ -189,7 +163,15 @@ struct HomeView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
-                                NavigationLink(value: item) {
+                                NavigationLink {
+                                    PlexResolveView(
+                                        item: item,
+                                        viewModel: viewModel,
+                                        searchModel: searchModel,
+                                        token: plexAuthManager.authToken,
+                                        preferredServerID: plexAuthManager.preferredServerID
+                                    )
+                                } label: {
                                     PosterCardView(
                                         title: item.title,
                                         subtitle: item.subtitle,
@@ -434,6 +416,7 @@ private struct PosterCardView: View {
             }
         }
         .frame(width: 140, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
