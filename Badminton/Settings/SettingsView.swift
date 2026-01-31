@@ -23,7 +23,6 @@ struct SettingsView: View {
                             }
                             serverPicker
                             accountPicker
-                            accountAliasEditor
                             Button("Disconnect Plex", role: .destructive) {
                                 plexAuthManager.signOut()
                             }
@@ -133,33 +132,7 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private var accountAliasEditor: some View {
-        if !plexAccounts.accounts.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Account names")
-                    .font(.callout.weight(.semibold))
-                Text("Give each account a friendly name for the picker.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                ForEach(plexAccounts.accounts) { account in
-                    let binding = Binding<String>(
-                        get: { plexAuthManager.accountAlias(for: account.id) ?? "" },
-                        set: { plexAuthManager.setAccountAlias($0, for: account.id) }
-                    )
-                    TextField("Account \(account.id)", text: binding)
-                        .textFieldStyle(.roundedBorder)
-                }
-            }
-            .padding(.top, 4)
-        }
-    }
-
     private func accountLabel(for account: PlexAccountOption) -> String {
-        if let alias = plexAuthManager.accountAlias(for: account.id), !alias.isEmpty {
-            let suffix = account.count == 1 ? "play" : "plays"
-            return "\(alias) · \(account.count) \(suffix)"
-        }
         if let name = plexAccounts.name(for: account.id) {
             let suffix = account.count == 1 ? "play" : "plays"
             return "\(name) · \(account.count) \(suffix)"
