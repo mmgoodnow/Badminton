@@ -630,10 +630,8 @@ final class HomeViewModel: ObservableObject {
             if typeHint == "movie" {
                 return .movie(id: tmdbID, title: item.title, posterPath: nil)
             }
-            if typeHint == "episode",
-               let seasonNumber = item.seasonNumber,
-               let episodeNumber = item.episodeNumber {
-                return .episode(tvID: tmdbID, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
+            if typeHint == "episode" {
+                return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
             }
             return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
         }
@@ -666,12 +664,20 @@ final class HomeViewModel: ObservableObject {
         if typeHint == "movie", let movie = response.movieResults.first {
             return .movie(id: movie.id, title: movie.title, posterPath: movie.posterPath)
         }
+        if typeHint == "episode",
+           let episode = response.tvEpisodeResults.first,
+           let showId = episode.showId,
+           let seasonNumber = episode.seasonNumber ?? item.seasonNumber,
+           let episodeNumber = episode.episodeNumber ?? item.episodeNumber {
+            return .episode(
+                tvID: showId,
+                seasonNumber: seasonNumber,
+                episodeNumber: episodeNumber,
+                title: episode.name ?? item.title,
+                stillPath: episode.stillPath
+            )
+        }
         if let tv = response.tvResults.first {
-            if typeHint == "episode",
-               let seasonNumber = item.seasonNumber,
-               let episodeNumber = item.episodeNumber {
-                return .episode(tvID: tv.id, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
-            }
             return .tv(id: tv.id, title: tv.name, posterPath: tv.posterPath)
         }
         return nil
@@ -695,11 +701,6 @@ final class HomeViewModel: ObservableObject {
             queryItems: tvSearchQueryItems(title: query, year: inferredYear(from: item))
         )
         guard let tv = response.results.first else { return nil }
-        if typeHint == "episode",
-           let seasonNumber = item.seasonNumber,
-           let episodeNumber = item.episodeNumber {
-            return .episode(tvID: tv.id, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
-        }
         return .tv(id: tv.id, title: tv.name, posterPath: tv.posterPath)
     }
 
