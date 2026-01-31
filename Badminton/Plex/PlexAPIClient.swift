@@ -196,6 +196,7 @@ final class PlexAPIClient {
         let serverURL = server.baseURL
         var components = URLComponents(url: serverURL.appendingPathComponent("library/metadata/\(ratingKey)"), resolvingAgainstBaseURL: false)
         components?.queryItems = [
+            URLQueryItem(name: "includeGuids", value: "1"),
             URLQueryItem(name: "X-Plex-Token", value: serverToken),
             URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
             URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)

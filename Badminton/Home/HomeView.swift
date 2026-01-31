@@ -566,6 +566,7 @@ final class HomeViewModel: ObservableObject {
     private var plexPreferredServerLoaded: String?
     private var plexPreferredAccountLoaded: Set<Int> = []
     private var plexRouteCache: [String: PlexNavigationRoute] = [:]
+    private var plexShowIDCache: [String: Int] = [:]
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -734,32 +735,34 @@ final class HomeViewModel: ObservableObject {
         let typeHint = (metadata?.type ?? item.type)?.lowercased()
         let isEpisode = typeHint == "episode"
             || (item.seasonNumber != nil && item.episodeNumber != nil && item.seriesTitle != nil)
-        var guidValues: [String] = []
-        if let guid = metadata?.guid {
-            guidValues.append(guid)
-        }
-        if let guids = metadata?.guids {
-            guidValues.append(contentsOf: guids.map(\.id))
-        }
-
         var notes: [String] = []
         if let metadataError {
             notes.append("Plex metadata: \(metadataError)")
         }
 
+        if isEpisode {
+            return await resolveEpisodeRoute(
+                item: item,
+                metadata: metadata,
+                token: token,
+                preferredServerID: preferredServerID,
+                notes: notes
+            )
+        }
+
+        let guidValues = extractGuids(from: metadata)
         if !guidValues.isEmpty {
             do {
                 if let route = try await resolveViaGuids(
                     guidValues,
                     typeHint: typeHint,
-                    isEpisode: isEpisode,
+                    isEpisode: false,
                     item: item
                 ) {
                     plexRouteCache[item.ratingKey] = route
                     return .success(route)
-                } else {
-                    notes.append("External IDs: No TMDB match for this item.")
                 }
+                notes.append("External IDs: No TMDB match for this item.")
             } catch {
                 return .failure(PlexResolveFailure(
                     step: .resolveGuids,
@@ -773,6 +776,100 @@ final class HomeViewModel: ObservableObject {
 
         do {
             if let route = try await resolveViaSearch(typeHint: typeHint, item: item) {
+                plexRouteCache[item.ratingKey] = route
+                return .success(route)
+            }
+            return .failure(PlexResolveFailure(
+                step: .resolveSearch,
+                reason: "No TMDB matches for this title.",
+                notes: notes
+            ))
+        } catch {
+            return .failure(PlexResolveFailure(
+                step: .resolveSearch,
+                reason: error.localizedDescription,
+                notes: notes
+            ))
+        }
+    }
+
+    private func resolveEpisodeRoute(
+        item: PlexRecentlyWatchedItem,
+        metadata: PlexMetadataItem?,
+        token: String,
+        preferredServerID: String?,
+        notes: [String]
+    ) async -> PlexResolveResult {
+        var episodeNotes = notes
+        guard let seasonNumber = item.seasonNumber, let episodeNumber = item.episodeNumber else {
+            episodeNotes.append("Episode numbers missing in Plex history.")
+            return await resolveEpisodeFallback(item: item, notes: episodeNotes)
+        }
+        if let showRatingKey = metadata?.grandparentRatingKey,
+           let cachedShowID = plexShowIDCache[showRatingKey] {
+            let route = PlexNavigationRoute.episode(
+                tvID: cachedShowID,
+                seasonNumber: seasonNumber,
+                episodeNumber: episodeNumber,
+                title: item.title,
+                stillPath: nil
+            )
+            plexRouteCache[item.ratingKey] = route
+            return .success(route)
+        }
+
+        var showGuids: [String] = []
+        var showRatingKey: String?
+        if let grandparentRatingKey = metadata?.grandparentRatingKey {
+            showRatingKey = grandparentRatingKey
+            do {
+                let showMetadata = try await plexClient.fetchMetadata(
+                    ratingKey: grandparentRatingKey,
+                    token: token,
+                    preferredServerID: preferredServerID
+                )
+                showGuids = extractGuids(from: showMetadata)
+            } catch {
+                episodeNotes.append("Show metadata: \(error.localizedDescription)")
+            }
+        } else {
+            episodeNotes.append("Show metadata: Missing grandparent ratingKey.")
+        }
+
+        if !showGuids.isEmpty {
+            do {
+                if let tvID = try await resolveShowID(from: showGuids, item: item) {
+                    if let showRatingKey {
+                        plexShowIDCache[showRatingKey] = tvID
+                    }
+                    let route = PlexNavigationRoute.episode(
+                        tvID: tvID,
+                        seasonNumber: seasonNumber,
+                        episodeNumber: episodeNumber,
+                        title: item.title,
+                        stillPath: nil
+                    )
+                    plexRouteCache[item.ratingKey] = route
+                    return .success(route)
+                }
+                episodeNotes.append("External IDs: No TMDB match for show.")
+            } catch {
+                return .failure(PlexResolveFailure(
+                    step: .resolveGuids,
+                    reason: error.localizedDescription,
+                    notes: episodeNotes
+                ))
+            }
+        } else {
+            episodeNotes.append("External IDs: None found on show.")
+        }
+
+        return await resolveEpisodeFallback(item: item, notes: episodeNotes)
+    }
+
+    private func resolveEpisodeFallback(item: PlexRecentlyWatchedItem, notes: [String]) async -> PlexResolveResult {
+        do {
+            if let route = try await resolveViaSearch(typeHint: "episode", item: item) {
                 plexRouteCache[item.ratingKey] = route
                 return .success(route)
             }
@@ -816,6 +913,32 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
+        return nil
+    }
+
+    private func resolveShowID(from guids: [String], item: PlexRecentlyWatchedItem) async throws -> Int? {
+        let parsed = parseExternalIDs(from: guids)
+        if let tmdbID = parsed.tmdbID {
+            return tmdbID
+        }
+        if let imdbID = parsed.imdbID {
+            let response: TMDBFindResponse = try await client.getV3(
+                path: "/3/find/\(imdbID)",
+                queryItems: [URLQueryItem(name: "external_source", value: "imdb_id")]
+            )
+            if let tv = response.tvResults.first {
+                return tv.id
+            }
+        }
+        if let tvdbID = parsed.tvdbID {
+            let response: TMDBFindResponse = try await client.getV3(
+                path: "/3/find/\(tvdbID)",
+                queryItems: [URLQueryItem(name: "external_source", value: "tvdb_id")]
+            )
+            if let tv = response.tvResults.first {
+                return tv.id
+            }
+        }
         return nil
     }
 
@@ -922,6 +1045,18 @@ final class HomeViewModel: ObservableObject {
             }
         }
         return result
+    }
+
+    private func extractGuids(from metadata: PlexMetadataItem?) -> [String] {
+        guard let metadata else { return [] }
+        var guidValues: [String] = []
+        if let guid = metadata.guid {
+            guidValues.append(guid)
+        }
+        if let guids = metadata.guids {
+            guidValues.append(contentsOf: guids.map(\.id))
+        }
+        return guidValues
     }
 
     private func extractExternalID(from guid: String, prefixes: [String]) -> String? {

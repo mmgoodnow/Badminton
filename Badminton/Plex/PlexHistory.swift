@@ -182,6 +182,8 @@ struct PlexMetadataResponse: Decodable {
 
 struct PlexMetadataItem: Decodable {
     let ratingKey: String?
+    let parentRatingKey: String?
+    let grandparentRatingKey: String?
     let guid: String?
     let type: String?
     let title: String?
@@ -194,6 +196,8 @@ struct PlexMetadataItem: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case ratingKey
+        case parentRatingKey
+        case grandparentRatingKey
         case guid
         case type
         case title
