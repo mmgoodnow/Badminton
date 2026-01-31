@@ -62,10 +62,15 @@ final class PlexAccountListViewModel: ObservableObject {
                 }
                 counts[accountID] = entry
             }
-            let allowedIDs = Set(homeUsers.keys)
-            accounts = counts
-                .filter { allowedIDs.contains($0.key) }
-                .map { PlexAccountOption(id: $0.key, count: $0.value.count, lastViewedAt: $0.value.lastViewedAt) }
+            accounts = homeUsers.values
+                .map { user in
+                    let entry = counts[user.id] ?? (count: 0, lastViewedAt: nil)
+                    return PlexAccountOption(
+                        id: user.id,
+                        count: entry.count,
+                        lastViewedAt: entry.lastViewedAt
+                    )
+                }
                 .sorted { lhs, rhs in
                     if lhs.count == rhs.count {
                         return (lhs.lastViewedAt ?? 0) > (rhs.lastViewedAt ?? 0)
