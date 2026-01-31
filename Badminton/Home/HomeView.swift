@@ -5,12 +5,14 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @StateObject private var searchModel = SearchViewModel()
+    @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    plexRecentlyWatchedSection
                     if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
@@ -88,6 +90,9 @@ struct HomeView: View {
             .task {
                 await viewModel.load()
             }
+            .task(id: plexAuthManager.authToken) {
+                await viewModel.loadPlexHistory(token: plexAuthManager.authToken)
+            }
             .refreshable {
                 await viewModel.load(force: true)
             }
@@ -116,6 +121,35 @@ struct HomeView: View {
                             SearchResultRow(item: item)
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var plexRecentlyWatchedSection: some View {
+        if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           plexAuthManager.isAuthenticated {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Recently Watched on Plex")
+                    .font(.title2.bold())
+
+                if viewModel.plexIsLoading && viewModel.plexRecentlyWatched.isEmpty {
+                    ProgressView("Loading Plex history…")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if !viewModel.plexRecentlyWatched.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(viewModel.plexRecentlyWatched) { item in
+                                PosterCardView(
+                                    title: item.displayTitle,
+                                    subtitle: item.displaySubtitle,
+                                    imageURL: item.imageURL
+                                )
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
             }
@@ -301,15 +335,20 @@ final class HomeViewModel: ObservableObject {
     @Published var onTheAirTV: [TMDBTVSeriesSummary] = []
     @Published var airingTodayTV: [TMDBTVSeriesSummary] = []
     @Published var popularPeople: [TMDBPersonSummary] = []
+    @Published var plexRecentlyWatched: [PlexHistoryItem] = []
+    @Published var plexIsLoading = false
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private let client: TMDBAPIClient
+    private let plexClient: PlexAPIClient
     private var imageConfig: TMDBImageConfigValues?
     private var hasLoaded = false
+    private var plexTokenLoaded: String?
 
-    init(client: TMDBAPIClient = TMDBAPIClient()) {
+    init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
+        self.plexClient = plexClient
     }
 
     func load(force: Bool = false) async {
@@ -363,6 +402,25 @@ final class HomeViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func loadPlexHistory(token: String?) async {
+        guard let token, !token.isEmpty else {
+            plexRecentlyWatched = []
+            plexTokenLoaded = nil
+            return
+        }
+
+        guard plexTokenLoaded != token || plexRecentlyWatched.isEmpty else { return }
+
+        plexIsLoading = true
+        do {
+            plexRecentlyWatched = try await plexClient.fetchHistory(token: token, size: 20)
+            plexTokenLoaded = token
+        } catch {
+            plexRecentlyWatched = []
+        }
+        plexIsLoading = false
     }
 
     func posterURL(path: String?) -> URL? {
