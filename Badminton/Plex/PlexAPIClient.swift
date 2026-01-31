@@ -47,7 +47,7 @@ final class PlexAPIClient {
         ]
         let url = components?.url ?? URL(string: "https://plex.tv/api/v2/home/users")!
         var request = URLRequest(url: url)
-        request.setValue("application/xml", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
@@ -56,7 +56,7 @@ final class PlexAPIClient {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        return PlexHomeUsersXMLParser.parse(data: data)
+        return try JSONDecoder().decode(PlexHomeUsersResponse.self, from: data).users
     }
 
     func fetchResourcesRaw(token: String) async throws -> PlexResourcesRawResult {
