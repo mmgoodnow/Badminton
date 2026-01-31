@@ -7,6 +7,7 @@ struct PlexHistoryCLI {
         var token: String?
         var size = 20
         var jsonOutput = false
+        var bundleID = "com.bebopbeluga.Badminton"
 
         var i = 0
         while i < args.count {
@@ -21,6 +22,11 @@ struct PlexHistoryCLI {
                     size = Int(args[i + 1]) ?? size
                     i += 1
                 }
+            case "--bundle-id":
+                if i + 1 < args.count {
+                    bundleID = args[i + 1]
+                    i += 1
+                }
             case "--json":
                 jsonOutput = true
             case "-h", "--help":
@@ -33,7 +39,8 @@ struct PlexHistoryCLI {
         }
 
         let envToken = ProcessInfo.processInfo.environment["PLEX_TOKEN"]
-        guard let authToken = token ?? envToken, !authToken.isEmpty else {
+        let storedToken = UserDefaults(suiteName: bundleID)?.string(forKey: "plex.auth.token")
+        guard let authToken = token ?? envToken ?? storedToken, !authToken.isEmpty else {
             print("Missing Plex token. Use --token or set PLEX_TOKEN.")
             printUsage()
             return
@@ -74,6 +81,6 @@ struct PlexHistoryCLI {
         print("    Badminton/Plex/PlexAPIClient.swift \\")
         print("    Badminton/Plex/PlexHistory.swift \\")
         print("    Badminton/Plex/PlexConfig.swift \\")
-        print("    --token <PLEX_TOKEN> [--size N] [--json]\n")
+        print("    [--token <PLEX_TOKEN>] [--size N] [--json] [--bundle-id <com.app.bundle>]\n")
     }
 }
