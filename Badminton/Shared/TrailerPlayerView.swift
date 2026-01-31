@@ -14,18 +14,27 @@ struct TrailerPlayerView: View {
 
     var body: some View {
         NavigationStack {
-            WebView(url: link.url)
-                .ignoresSafeArea()
-                .navigationTitle(link.title)
+            ZStack {
+                Color.black
+                    .ignoresSafeArea()
+                WebView(url: link.url)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .navigationTitle(link.title)
 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.inline)
 #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") { dismiss() }
-                    }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
                 }
+            }
         }
+        #if os(iOS)
+        .presentationDetents([.large])
+        #else
+        .frame(minWidth: 900, minHeight: 600)
+        #endif
     }
 }
 
@@ -36,6 +45,7 @@ private struct WebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.allowsBackForwardNavigationGestures = true
         return view
