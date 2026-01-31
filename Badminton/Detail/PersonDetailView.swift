@@ -139,7 +139,9 @@ struct PersonDetailView: View {
                                 imageURL: viewModel.posterURL(path: credit.posterPath)
                             )
                             if credit.mediaType == .movie || credit.mediaType == .tv {
-                                NavigationLink(value: credit) {
+                                NavigationLink {
+                                    creditDestination(credit)
+                                } label: {
                                     card
                                 }
                                 .buttonStyle(.plain)
@@ -171,7 +173,9 @@ struct PersonDetailView: View {
                             imageURL: viewModel.posterURL(path: credit.posterPath)
                         )
                         if credit.mediaType == .movie || credit.mediaType == .tv {
-                            NavigationLink(value: credit) {
+                            NavigationLink {
+                                creditDestination(credit)
+                            } label: {
                                 row
                             }
                             .buttonStyle(.plain)
@@ -197,6 +201,20 @@ struct PersonDetailView: View {
 
     private func showLightbox(url: URL, title: String) {
         lightboxItem = ImageLightboxItem(url: url, title: title)
+    }
+
+    @ViewBuilder
+    private func creditDestination(_ credit: TMDBMediaCredit) -> some View {
+        switch credit.mediaType {
+        case .movie:
+            MovieDetailView(movieID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+        case .tv:
+            TVDetailView(tvID: credit.id, title: credit.displayTitle, posterPath: credit.posterPath)
+        case .person, .unknown:
+            Text("Details coming soon.")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
