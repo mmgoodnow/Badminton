@@ -5,11 +5,13 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @StateObject private var searchModel = SearchViewModel()
+    @EnvironmentObject private var plexAuthManager: PlexAuthManager
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    plexSection
                     if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
@@ -70,6 +72,38 @@ struct HomeView: View {
             }
             .refreshable {
                 await viewModel.load(force: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var plexSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Plex")
+                .font(.title2.bold())
+
+            if plexAuthManager.isAuthenticated {
+                Text("Connected")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button("Disconnect Plex") {
+                    plexAuthManager.signOut()
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Text("Connect your Plex account to personalize this view.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button(plexAuthManager.isAuthenticating ? "Connecting…" : "Connect Plex") {
+                    Task { await plexAuthManager.signIn() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(plexAuthManager.isAuthenticating)
+                if let errorMessage = plexAuthManager.errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
             }
         }
     }
