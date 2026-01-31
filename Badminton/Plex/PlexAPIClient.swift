@@ -35,7 +35,7 @@ final class PlexAPIClient {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        let items = try parseHistoryItems(from: data)
+        let items = try parseHistoryItems(from: data, response: http)
         return PlexHistoryResult(items: items, serverBaseURL: serverURL, serverToken: serverToken)
     }
 
@@ -85,15 +85,23 @@ final class PlexAPIClient {
         return candidates.first(where: { $0.uri != nil })?.uri
     }
 
-    private func parseHistoryItems(from data: Data) throws -> [PlexHistoryItem] {
+    private func parseHistoryItems(from data: Data, response: HTTPURLResponse) throws -> [PlexHistoryItem] {
         do {
             return try PlexHistoryParser.parseJSON(data)
         } catch {
+            logParseFailure(data: data, response: response, error: error)
             if let items = PlexHistoryParser.parseXML(data) {
                 return items
             }
             throw error
         }
+    }
+
+    private func logParseFailure(data: Data, response: HTTPURLResponse, error: Error) {
+        let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
+        let prefix = String(data: data.prefix(400), encoding: .utf8) ?? "<non-utf8>"
+        print("Plex history parse failed (\(contentType)): \(error)")
+        print("Plex history response preview: \(prefix)")
     }
 }
 
