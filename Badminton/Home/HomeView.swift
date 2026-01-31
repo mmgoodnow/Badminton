@@ -314,6 +314,7 @@ private struct PlexResolveView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var resolvedRoute: PlexNavigationRoute?
     @State private var didFail = false
+    @State private var failureDetail: PlexResolveFailure?
 
     var body: some View {
         Group {
@@ -349,9 +350,26 @@ private struct PlexResolveView: View {
                             .foregroundStyle(.secondary)
                     }
                     .multilineTextAlignment(.center)
-                    Text("Try searching TMDB or check the Plex metadata.")
-                        .font(.footnote)
+                    if let failureDetail {
+                        VStack(spacing: 4) {
+                            Text("Failed at: \(failureDetail.step.label)")
+                                .font(.footnote.weight(.semibold))
+                            if let reason = failureDetail.reason {
+                                Text(reason)
+                                    .font(.footnote)
+                            }
+                            ForEach(failureDetail.notes, id: \.self) { note in
+                                Text(note)
+                                    .font(.footnote)
+                            }
+                        }
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    } else {
+                        Text("Try searching TMDB or check the Plex metadata.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                     Button("Search TMDB") {
                         let fallbackQuery = item.seriesTitle ?? item.title
                         searchModel.query = fallbackQuery
@@ -374,16 +392,24 @@ private struct PlexResolveView: View {
     private func resolve() async {
         guard resolvedRoute == nil, !didFail else { return }
         guard let token, !token.isEmpty else {
+            failureDetail = PlexResolveFailure(
+                step: .missingToken,
+                reason: "Missing or expired Plex auth token.",
+                notes: []
+            )
             didFail = true
             return
         }
-        if let route = await viewModel.resolvePlexRoute(
+        let result = await viewModel.resolvePlexRoute(
             for: item,
             token: token,
             preferredServerID: preferredServerID
-        ) {
+        )
+        switch result {
+        case .success(let route):
             resolvedRoute = route
-        } else {
+        case .failure(let failure):
+            failureDetail = failure
             didFail = true
         }
     }
@@ -410,6 +436,37 @@ enum PlexNavigationRoute: Hashable {
     case movie(id: Int, title: String?, posterPath: String?)
     case tv(id: Int, title: String?, posterPath: String?)
     case episode(tvID: Int, seasonNumber: Int, episodeNumber: Int, title: String?, stillPath: String?)
+}
+
+enum PlexResolveStep: String, Hashable {
+    case missingToken
+    case fetchMetadata
+    case resolveGuids
+    case resolveSearch
+
+    var label: String {
+        switch self {
+        case .missingToken:
+            return "Plex authentication"
+        case .fetchMetadata:
+            return "Fetch Plex metadata"
+        case .resolveGuids:
+            return "Resolve external IDs"
+        case .resolveSearch:
+            return "Search TMDB"
+        }
+    }
+}
+
+struct PlexResolveFailure: Hashable {
+    let step: PlexResolveStep
+    let reason: String?
+    let notes: [String]
+}
+
+enum PlexResolveResult: Hashable {
+    case success(PlexNavigationRoute)
+    case failure(PlexResolveFailure)
 }
 
 private struct PlexExternalIDs {
@@ -658,16 +715,22 @@ final class HomeViewModel: ObservableObject {
         plexIsLoading = false
     }
 
-    func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexNavigationRoute? {
+    func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexResolveResult {
         if let cached = plexRouteCache[item.ratingKey] {
-            return cached
+            return .success(cached)
         }
 
-        let metadata = try? await plexClient.fetchMetadata(
-            ratingKey: item.ratingKey,
-            token: token,
-            preferredServerID: preferredServerID
-        )
+        var metadata: PlexMetadataItem?
+        var metadataError: String?
+        do {
+            metadata = try await plexClient.fetchMetadata(
+                ratingKey: item.ratingKey,
+                token: token,
+                preferredServerID: preferredServerID
+            )
+        } catch {
+            metadataError = error.localizedDescription
+        }
         let typeHint = (metadata?.type ?? item.type)?.lowercased()
         let isEpisode = typeHint == "episode"
             || (item.seasonNumber != nil && item.episodeNumber != nil && item.seriesTitle != nil)
@@ -679,22 +742,52 @@ final class HomeViewModel: ObservableObject {
             guidValues.append(contentsOf: guids.map(\.id))
         }
 
-        if let route = try? await resolveViaGuids(
-            guidValues,
-            typeHint: typeHint,
-            isEpisode: isEpisode,
-            item: item
-        ) {
-            plexRouteCache[item.ratingKey] = route
-            return route
+        var notes: [String] = []
+        if let metadataError {
+            notes.append("Plex metadata: \(metadataError)")
         }
 
-        if let route = try? await resolveViaSearch(typeHint: typeHint, item: item) {
-            plexRouteCache[item.ratingKey] = route
-            return route
+        if !guidValues.isEmpty {
+            do {
+                if let route = try await resolveViaGuids(
+                    guidValues,
+                    typeHint: typeHint,
+                    isEpisode: isEpisode,
+                    item: item
+                ) {
+                    plexRouteCache[item.ratingKey] = route
+                    return .success(route)
+                } else {
+                    notes.append("External IDs: No TMDB match for this item.")
+                }
+            } catch {
+                return .failure(PlexResolveFailure(
+                    step: .resolveGuids,
+                    reason: error.localizedDescription,
+                    notes: notes
+                ))
+            }
+        } else {
+            notes.append("External IDs: None found in Plex metadata.")
         }
 
-        return nil
+        do {
+            if let route = try await resolveViaSearch(typeHint: typeHint, item: item) {
+                plexRouteCache[item.ratingKey] = route
+                return .success(route)
+            }
+            return .failure(PlexResolveFailure(
+                step: .resolveSearch,
+                reason: "No TMDB matches for this title.",
+                notes: notes
+            ))
+        } catch {
+            return .failure(PlexResolveFailure(
+                step: .resolveSearch,
+                reason: error.localizedDescription,
+                notes: notes
+            ))
+        }
     }
 
     private func resolveViaGuids(
