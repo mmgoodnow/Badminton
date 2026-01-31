@@ -13,6 +13,12 @@ final class PlexAuthManager: NSObject, ObservableObject {
     @Published private(set) var isAuthenticated: Bool = false
     @Published private(set) var isAuthenticating: Bool = false
     @Published var errorMessage: String?
+    @Published var preferredServerID: String? {
+        didSet { storage.save(preferredServerID, for: .preferredServerID) }
+    }
+    @Published var preferredServerName: String? {
+        didSet { storage.save(preferredServerName, for: .preferredServerName) }
+    }
 
     private let session: URLSession
     private var webAuthSession: ASWebAuthenticationSession?
@@ -23,6 +29,8 @@ final class PlexAuthManager: NSObject, ObservableObject {
         super.init()
         authToken = storage.read(.authToken)
         isAuthenticated = authToken != nil
+        preferredServerID = storage.read(.preferredServerID)
+        preferredServerName = storage.read(.preferredServerName)
     }
 
     func signIn() async {
@@ -48,6 +56,15 @@ final class PlexAuthManager: NSObject, ObservableObject {
         authToken = nil
         isAuthenticated = false
         storage.delete(.authToken)
+        preferredServerID = nil
+        preferredServerName = nil
+        storage.delete(.preferredServerID)
+        storage.delete(.preferredServerName)
+    }
+
+    func setPreferredServer(id: String?, name: String?) {
+        preferredServerID = id
+        preferredServerName = name
     }
 
     private func createPin() async throws -> PlexPin {
@@ -242,9 +259,15 @@ enum PlexAuthError: LocalizedError {
 private struct PlexTokenStore {
     enum Key: String {
         case authToken = "plex.auth.token"
+        case preferredServerID = "plex.server.id"
+        case preferredServerName = "plex.server.name"
     }
 
-    func save(_ value: String, for key: Key) {
+    func save(_ value: String?, for key: Key) {
+        guard let value else {
+            delete(key)
+            return
+        }
         UserDefaults.standard.set(value, forKey: key.rawValue)
     }
 

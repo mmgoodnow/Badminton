@@ -7,20 +7,36 @@ final class PlexAPIClient {
         self.session = session
     }
 
-    func fetchRecentlyWatched(token: String, size: Int = 20) async throws -> PlexHistoryResult {
-        let result = try await requestHistoryData(token: token, size: size)
+    func fetchRecentlyWatched(token: String, size: Int = 20, preferredServerID: String? = nil) async throws -> PlexHistoryResult {
+        let result = try await requestHistoryData(token: token, size: size, preferredServerID: preferredServerID)
         let items = try parseHistoryItems(from: result.data)
         return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
     }
 
-    func fetchRecentlyWatchedRaw(token: String, size: Int = 20) async throws -> PlexHistoryRawResult {
-        let result = try await requestHistoryData(token: token, size: size)
+    func fetchRecentlyWatchedRaw(token: String, size: Int = 20, preferredServerID: String? = nil) async throws -> PlexHistoryRawResult {
+        let result = try await requestHistoryData(token: token, size: size, preferredServerID: preferredServerID)
         return PlexHistoryRawResult(
             data: result.data,
             response: result.response,
             serverBaseURL: result.serverBaseURL,
             serverToken: result.serverToken
         )
+    }
+
+    func fetchServers(token: String) async throws -> [PlexServer] {
+        let response = try await fetchResources(token: token)
+        return response.devices
+            .filter { $0.provides?.contains("server") == true }
+            .map { device in
+                PlexServer(
+                    id: device.clientIdentifier,
+                    name: device.name ?? "Plex Server",
+                    product: device.product,
+                    platform: device.platform,
+                    owned: device.owned ?? false,
+                    lastSeenAt: device.lastSeenAt
+                )
+            }
     }
 
     func fetchResourcesRaw(token: String) async throws -> PlexResourcesRawResult {
@@ -54,9 +70,14 @@ final class PlexAPIClient {
         return (data, http)
     }
 
-    private func selectServer(from response: PlexResourcesResponse) -> PlexServerCandidate? {
+    private func selectServer(from response: PlexResourcesResponse, preferredServerID: String?) -> PlexServerCandidate? {
         let devices = response.devices
         let servers = devices.filter { $0.provides?.contains("server") == true }
+        if let preferredServerID,
+           let preferred = servers.first(where: { $0.clientIdentifier == preferredServerID }),
+           let connection = bestConnection(from: preferred.connections) {
+            return PlexServerCandidate(baseURL: connection, accessToken: preferred.accessToken)
+        }
         for device in servers {
             if let connection = bestConnection(from: device.connections) {
                 return PlexServerCandidate(baseURL: connection, accessToken: device.accessToken)
@@ -86,9 +107,9 @@ final class PlexAPIClient {
         return candidates.first(where: { $0.uri != nil })?.uri
     }
 
-    private func requestHistoryData(token: String, size: Int) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
+    private func requestHistoryData(token: String, size: Int, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
         let resourceResponse = try await fetchResources(token: token)
-        guard let server = selectServer(from: resourceResponse) else {
+        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
             throw URLError(.cannotFindHost)
         }
 
@@ -157,13 +178,25 @@ private struct PlexResourcesResponse: Decodable {
 }
 
 private struct PlexDevice: Decodable {
+    let name: String?
+    let product: String?
+    let platform: String?
+    let clientIdentifier: String
     let provides: String?
     let accessToken: String?
+    let owned: Bool?
+    let lastSeenAt: String?
     let connections: [PlexConnection]
 
     private enum CodingKeys: String, CodingKey {
+        case name
+        case product
+        case platform
+        case clientIdentifier
         case provides
         case accessToken
+        case owned
+        case lastSeenAt
         case connections = "connections"
     }
 }

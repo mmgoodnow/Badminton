@@ -91,7 +91,16 @@ struct HomeView: View {
                 await viewModel.load()
             }
             .task(id: plexAuthManager.authToken) {
-                await viewModel.loadPlexHistory(token: plexAuthManager.authToken)
+                await viewModel.loadPlexHistory(
+                    token: plexAuthManager.authToken,
+                    preferredServerID: plexAuthManager.preferredServerID
+                )
+            }
+            .task(id: plexAuthManager.preferredServerID) {
+                await viewModel.loadPlexHistory(
+                    token: plexAuthManager.authToken,
+                    preferredServerID: plexAuthManager.preferredServerID
+                )
             }
             .refreshable {
                 await viewModel.load(force: true)
@@ -352,6 +361,7 @@ final class HomeViewModel: ObservableObject {
     private var imageConfig: TMDBImageConfigValues?
     private var hasLoaded = false
     private var plexTokenLoaded: String?
+    private var plexPreferredServerLoaded: String?
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -411,18 +421,25 @@ final class HomeViewModel: ObservableObject {
         isLoading = false
     }
 
-    func loadPlexHistory(token: String?) async {
+    func loadPlexHistory(token: String?, preferredServerID: String?) async {
         guard let token, !token.isEmpty else {
             plexRecentlyWatched = []
             plexTokenLoaded = nil
             return
         }
 
-        guard plexTokenLoaded != token || plexRecentlyWatched.isEmpty else { return }
+        guard plexTokenLoaded != token
+            || plexPreferredServerLoaded != preferredServerID
+            || plexRecentlyWatched.isEmpty
+        else { return }
 
         plexIsLoading = true
         do {
-            let result = try await plexClient.fetchRecentlyWatched(token: token, size: 20)
+            let result = try await plexClient.fetchRecentlyWatched(
+                token: token,
+                size: 20,
+                preferredServerID: preferredServerID
+            )
             plexRecentlyWatched = result.items.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
@@ -435,6 +452,7 @@ final class HomeViewModel: ObservableObject {
                 )
             }
             plexTokenLoaded = token
+            plexPreferredServerLoaded = preferredServerID
         } catch {
             plexRecentlyWatched = []
             print("Plex history error: \(error)")
