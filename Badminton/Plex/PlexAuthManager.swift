@@ -22,7 +22,6 @@ final class PlexAuthManager: NSObject, ObservableObject {
     @Published var preferredAccountID: Int? {
         didSet { storage.save(preferredAccountID.map(String.init), for: .preferredAccountID) }
     }
-    @Published private(set) var accountAliases: [Int: String] = [:]
 
     private let session: URLSession
     private var webAuthSession: ASWebAuthenticationSession?
@@ -38,7 +37,6 @@ final class PlexAuthManager: NSObject, ObservableObject {
         if let accountID = storage.read(.preferredAccountID) {
             preferredAccountID = Int(accountID)
         }
-        accountAliases = storage.readAliases()
     }
 
     func signIn() async {
@@ -79,20 +77,6 @@ final class PlexAuthManager: NSObject, ObservableObject {
 
     func setPreferredAccountID(_ id: Int?) {
         preferredAccountID = id
-    }
-
-    func accountAlias(for accountID: Int) -> String? {
-        accountAliases[accountID]
-    }
-
-    func setAccountAlias(_ alias: String?, for accountID: Int) {
-        let trimmed = alias?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if trimmed.isEmpty {
-            accountAliases.removeValue(forKey: accountID)
-        } else {
-            accountAliases[accountID] = trimmed
-        }
-        storage.saveAliases(accountAliases)
     }
 
     private func createPin() async throws -> PlexPin {
@@ -290,7 +274,6 @@ private struct PlexTokenStore {
         case preferredServerID = "plex.server.id"
         case preferredServerName = "plex.server.name"
         case preferredAccountID = "plex.account.id"
-        case accountAliases = "plex.account.aliases"
     }
 
     func save(_ value: String?, for key: Key) {
@@ -307,27 +290,5 @@ private struct PlexTokenStore {
 
     func delete(_ key: Key) {
         UserDefaults.standard.removeObject(forKey: key.rawValue)
-    }
-
-    func saveAliases(_ aliases: [Int: String]) {
-        let payload = Dictionary(uniqueKeysWithValues: aliases.map { (String($0.key), $0.value) })
-        if let data = try? JSONEncoder().encode(payload) {
-            UserDefaults.standard.set(data, forKey: Key.accountAliases.rawValue)
-        } else {
-            UserDefaults.standard.removeObject(forKey: Key.accountAliases.rawValue)
-        }
-    }
-
-    func readAliases() -> [Int: String] {
-        guard let data = UserDefaults.standard.data(forKey: Key.accountAliases.rawValue),
-              let decoded = try? JSONDecoder().decode([String: String].self, from: data)
-        else { return [:] }
-        var result: [Int: String] = [:]
-        for (key, value) in decoded {
-            if let id = Int(key) {
-                result[id] = value
-            }
-        }
-        return result
     }
 }
