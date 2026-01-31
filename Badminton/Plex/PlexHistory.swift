@@ -3,13 +3,12 @@ import Foundation
 struct PlexHistoryResponse: Decodable {
     let items: [PlexHistoryItem]
 
-    private enum RootKeys: String, CodingKey {
-        case items
+    private enum CodingKeys: String, CodingKey {
         case mediaContainer = "MediaContainer"
     }
 
     private struct MediaContainer: Decodable {
-        let metadata: [PlexHistoryItem]?
+        let metadata: [PlexHistoryItem]
 
         private enum CodingKeys: String, CodingKey {
             case metadata = "Metadata"
@@ -17,22 +16,14 @@ struct PlexHistoryResponse: Decodable {
     }
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: RootKeys.self)
-        if let items = try? container.decode([PlexHistoryItem].self, forKey: .items) {
-            self.items = items
-            return
-        }
-        if let media = try? container.decode(MediaContainer.self, forKey: .mediaContainer),
-           let metadata = media.metadata {
-            self.items = metadata
-            return
-        }
-        self.items = []
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let mediaContainer = try container.decode(MediaContainer.self, forKey: .mediaContainer)
+        items = mediaContainer.metadata
     }
 }
 
 struct PlexHistoryItem: Decodable, Identifiable {
-    let id: String
+    let ratingKey: String
     let type: String
     let title: String
     let grandparentTitle: String?
@@ -44,8 +35,9 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let parentThumb: String?
     let grandparentThumb: String?
 
+    var id: String { ratingKey }
+
     private enum CodingKeys: String, CodingKey {
-        case id
         case ratingKey
         case type
         case title
@@ -57,68 +49,6 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case thumb
         case parentThumb
         case grandparentThumb
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        if let ratingKey = try? container.decode(String.self, forKey: .ratingKey) {
-            id = ratingKey
-        } else if let ratingKeyInt = try? container.decode(Int.self, forKey: .ratingKey) {
-            id = String(ratingKeyInt)
-        } else if let rawID = try? container.decode(String.self, forKey: .id) {
-            id = rawID
-        } else if let rawIDInt = try? container.decode(Int.self, forKey: .id) {
-            id = String(rawIDInt)
-        } else {
-            id = UUID().uuidString
-        }
-
-        type = (try? container.decode(String.self, forKey: .type)) ?? "unknown"
-        title = (try? container.decode(String.self, forKey: .title)) ?? ""
-        grandparentTitle = try? container.decode(String.self, forKey: .grandparentTitle)
-        parentTitle = try? container.decode(String.self, forKey: .parentTitle)
-        index = try? container.decode(Int.self, forKey: .index)
-        parentIndex = try? container.decode(Int.self, forKey: .parentIndex)
-        year = try? container.decode(Int.self, forKey: .year)
-        thumb = try? container.decode(String.self, forKey: .thumb)
-        parentThumb = try? container.decode(String.self, forKey: .parentThumb)
-        grandparentThumb = try? container.decode(String.self, forKey: .grandparentThumb)
-    }
-
-    init(attributes: [String: String]) {
-        if let ratingKey = attributes["ratingKey"] {
-            id = ratingKey
-        } else if let rawID = attributes["id"] {
-            id = rawID
-        } else {
-            id = UUID().uuidString
-        }
-
-        type = attributes["type"] ?? "unknown"
-        title = attributes["title"] ?? ""
-        grandparentTitle = attributes["grandparentTitle"]
-        parentTitle = attributes["parentTitle"]
-        index = Int(attributes["index"] ?? "")
-        parentIndex = Int(attributes["parentIndex"] ?? "")
-        year = Int(attributes["year"] ?? "")
-        thumb = attributes["thumb"]
-        parentThumb = attributes["parentThumb"]
-        grandparentThumb = attributes["grandparentThumb"]
-    }
-
-    init(json: [String: Any]) {
-        var attributes: [String: String] = [:]
-        for (key, value) in json {
-            switch value {
-            case let stringValue as String:
-                attributes[key] = stringValue
-            case let numberValue as NSNumber:
-                attributes[key] = numberValue.stringValue
-            default:
-                continue
-            }
-        }
-        self.init(attributes: attributes)
     }
 
     var displayTitle: String {
@@ -183,64 +113,5 @@ struct PlexHistoryItem: Decodable, Identifiable {
         }
         return URL(string: "https://metadata-static.plex.tv")?
             .appendingPathComponent(path)
-    }
-}
-
-enum PlexHistoryParser {
-    static func parseJSON(_ data: Data) throws -> [PlexHistoryItem] {
-        let decoder = JSONDecoder()
-        if let response = try? decoder.decode(PlexHistoryResponse.self, from: data) {
-            return response.items
-        }
-        if let array = try? decoder.decode([PlexHistoryItem].self, from: data) {
-            return array
-        }
-        let json = try JSONSerialization.jsonObject(with: data, options: [])
-        if let dict = json as? [String: Any] {
-            if let media = dict["MediaContainer"] as? [String: Any] {
-                if let metadata = media["Metadata"] as? [[String: Any]] {
-                    return metadata.map { PlexHistoryItem(json: $0) }
-                }
-                if let metadata = media["Metadata"] as? [String: Any] {
-                    return [PlexHistoryItem(json: metadata)]
-                }
-            }
-            if let items = dict["items"] as? [[String: Any]] {
-                return items.map { PlexHistoryItem(json: $0) }
-            }
-        }
-        if let array = json as? [[String: Any]] {
-            return array.map { PlexHistoryItem(json: $0) }
-        }
-        throw DecodingError.dataCorrupted(
-            DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Unsupported Plex history JSON format"
-            )
-        )
-    }
-
-    static func parseXML(_ data: Data) -> [PlexHistoryItem]? {
-        let parser = XMLParser(data: data)
-        let delegate = PlexHistoryXMLParser()
-        parser.delegate = delegate
-        guard parser.parse() else { return nil }
-        return delegate.items
-    }
-}
-
-private final class PlexHistoryXMLParser: NSObject, XMLParserDelegate {
-    var items: [PlexHistoryItem] = []
-
-    func parser(
-        _ parser: XMLParser,
-        didStartElement elementName: String,
-        namespaceURI: String?,
-        qualifiedName qName: String?,
-        attributes attributeDict: [String: String]
-    ) {
-        if elementName == "Metadata" {
-            items.append(PlexHistoryItem(attributes: attributeDict))
-        }
     }
 }

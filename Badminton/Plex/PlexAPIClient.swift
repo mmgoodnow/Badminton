@@ -9,7 +9,7 @@ final class PlexAPIClient {
 
     func fetchRecentlyWatched(token: String, size: Int = 20) async throws -> PlexHistoryResult {
         let result = try await requestHistoryData(token: token, size: size)
-        let items = try parseHistoryItems(from: result.data, response: result.response)
+        let items = try parseHistoryItems(from: result.data)
         return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
     }
 
@@ -55,7 +55,7 @@ final class PlexAPIClient {
     }
 
     private func selectServer(from response: PlexResourcesResponse) -> PlexServerCandidate? {
-        let devices = response.mediaContainer.devices
+        let devices = response.devices
         let servers = devices.filter { $0.provides?.contains("server") == true }
         for device in servers {
             if let connection = bestConnection(from: device.connections) {
@@ -110,23 +110,10 @@ final class PlexAPIClient {
         return (data, http, serverURL, serverToken)
     }
 
-    private func parseHistoryItems(from data: Data, response: HTTPURLResponse) throws -> [PlexHistoryItem] {
-        do {
-            return try PlexHistoryParser.parseJSON(data)
-        } catch {
-            logParseFailure(data: data, response: response, error: error)
-            if let items = PlexHistoryParser.parseXML(data) {
-                return items
-            }
-            throw error
-        }
-    }
-
-    private func logParseFailure(data: Data, response: HTTPURLResponse, error: Error) {
-        let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
-        let prefix = String(data: data.prefix(2000), encoding: .utf8) ?? "<non-utf8>"
-        print("Plex history parse failed (\(contentType)): \(error)")
-        print("Plex history response preview: \(prefix)")
+    private func parseHistoryItems(from data: Data) throws -> [PlexHistoryItem] {
+        let decoder = JSONDecoder()
+        let response = try decoder.decode(PlexHistoryResponse.self, from: data)
+        return response.items
     }
 }
 
@@ -154,43 +141,11 @@ private struct PlexServerCandidate {
 }
 
 private struct PlexResourcesResponse: Decodable {
-    let mediaContainer: PlexMediaContainer
-
-    private enum CodingKeys: String, CodingKey {
-        case mediaContainer = "MediaContainer"
-    }
+    let devices: [PlexDevice]
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let devices = try? container.decode([PlexDevice].self) {
-            mediaContainer = PlexMediaContainer(devices: devices)
-            return
-        }
-        let keyed = try decoder.container(keyedBy: CodingKeys.self)
-        mediaContainer = try keyed.decode(PlexMediaContainer.self, forKey: .mediaContainer)
-    }
-}
-
-private struct PlexMediaContainer: Decodable {
-    let devices: [PlexDevice]
-
-    private enum CodingKeys: String, CodingKey {
-        case devices = "Device"
-    }
-
-    init(devices: [PlexDevice]) {
-        self.devices = devices
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        if let array = try? container.decode([PlexDevice].self, forKey: .devices) {
-            devices = array
-        } else if let single = try? container.decode(PlexDevice.self, forKey: .devices) {
-            devices = [single]
-        } else {
-            devices = []
-        }
+        devices = try container.decode([PlexDevice].self)
     }
 }
 
@@ -202,32 +157,7 @@ private struct PlexDevice: Decodable {
     private enum CodingKeys: String, CodingKey {
         case provides
         case accessToken
-        case connections = "Connection"
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        if let provides = try? container.decode(String.self, forKey: .provides) {
-            self.provides = provides
-        } else if let providesArray = try? container.decode([String].self, forKey: .provides) {
-            self.provides = providesArray.joined(separator: ",")
-        } else {
-            self.provides = nil
-        }
-
-        if let accessToken = try? container.decode(String.self, forKey: .accessToken) {
-            self.accessToken = accessToken
-        } else {
-            self.accessToken = nil
-        }
-
-        if let array = try? container.decode([PlexConnection].self, forKey: .connections) {
-            connections = array
-        } else if let single = try? container.decode(PlexConnection.self, forKey: .connections) {
-            connections = [single]
-        } else {
-            connections = []
-        }
+        case connections = "connections"
     }
 }
 
@@ -239,34 +169,12 @@ private struct PlexConnection: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case uri
-        case local
-        case relay
+        case isLocal = "local"
+        case isRelay = "relay"
         case `protocol` = "protocol"
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let uriString = (try? container.decode(String.self, forKey: .uri)) ?? ""
-        uri = URL(string: uriString)
-        isLocal = PlexConnection.decodeBool(container: container, key: .local)
-        isRelay = PlexConnection.decodeBool(container: container, key: .relay)
-        `protocol` = try? container.decode(String.self, forKey: .protocol)
     }
 
     var isSecure: Bool {
         uri?.scheme == "https"
-    }
-
-    private static func decodeBool(container: KeyedDecodingContainer<CodingKeys>, key: CodingKeys) -> Bool {
-        if let bool = try? container.decode(Bool.self, forKey: key) {
-            return bool
-        }
-        if let intValue = try? container.decode(Int.self, forKey: key) {
-            return intValue == 1
-        }
-        if let string = try? container.decode(String.self, forKey: key) {
-            return string == "1" || string.lowercased() == "true"
-        }
-        return false
     }
 }
