@@ -138,6 +138,10 @@ struct HomeView: View {
                 if viewModel.plexIsLoading && viewModel.plexRecentlyWatched.isEmpty {
                     ProgressView("Loading Plex history…")
                         .frame(maxWidth: .infinity, alignment: .center)
+                } else if let message = viewModel.plexErrorMessage, !message.isEmpty {
+                    Text("Plex: \(message)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } else if !viewModel.plexRecentlyWatched.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
@@ -344,6 +348,7 @@ final class HomeViewModel: ObservableObject {
     @Published var popularPeople: [TMDBPersonSummary] = []
     @Published var plexRecentlyWatched: [PlexRecentlyWatchedItem] = []
     @Published var plexIsLoading = false
+    @Published var plexErrorMessage: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -415,12 +420,14 @@ final class HomeViewModel: ObservableObject {
         guard let token, !token.isEmpty else {
             plexRecentlyWatched = []
             plexTokenLoaded = nil
+            plexErrorMessage = nil
             return
         }
 
         guard plexTokenLoaded != token || plexRecentlyWatched.isEmpty else { return }
 
         plexIsLoading = true
+        plexErrorMessage = nil
         do {
             let result = try await plexClient.fetchRecentlyWatched(token: token, size: 20)
             plexRecentlyWatched = result.items.compactMap { item in
@@ -437,6 +444,7 @@ final class HomeViewModel: ObservableObject {
             plexTokenLoaded = token
         } catch {
             plexRecentlyWatched = []
+            plexErrorMessage = error.localizedDescription
         }
         plexIsLoading = false
     }

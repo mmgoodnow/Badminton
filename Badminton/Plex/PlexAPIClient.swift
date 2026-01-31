@@ -16,12 +16,12 @@ final class PlexAPIClient {
         let serverToken = server.accessToken ?? token
         let serverURL = server.baseURL
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("/status/sessions/history/all"), resolvingAgainstBaseURL: false)
+        var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
         components?.queryItems = [
             URLQueryItem(name: "sort", value: "viewedAt:desc"),
             URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)")
         ]
-        let url = components?.url ?? serverURL.appendingPathComponent("/status/sessions/history/all")
+        let url = components?.url ?? serverURL.appendingPathComponent("status/sessions/history/all")
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
@@ -58,7 +58,7 @@ final class PlexAPIClient {
     }
 
     private func selectServer(from response: PlexResourcesResponse) -> PlexServerCandidate? {
-        let devices = response.mediaContainer.devices ?? []
+        let devices = response.mediaContainer.devices
         let servers = devices.filter { $0.provides?.contains("server") == true }
         for device in servers {
             if let connection = bestConnection(from: device.connections) {
@@ -70,13 +70,16 @@ final class PlexAPIClient {
 
     private func bestConnection(from connections: [PlexConnection]?) -> URL? {
         let candidates = connections ?? []
-        if let local = candidates.first(where: { $0.isLocal }) {
+        if let local = candidates.first(where: { $0.isLocal && $0.uri != nil }) {
             return local.uri
         }
-        if let https = candidates.first(where: { $0.isSecure }) {
+        if let https = candidates.first(where: { !$0.isRelay && $0.isSecure && $0.uri != nil }) {
             return https.uri
         }
-        return candidates.first?.uri
+        if let preferred = candidates.first(where: { !$0.isRelay && $0.uri != nil }) {
+            return preferred.uri
+        }
+        return candidates.first(where: { $0.uri != nil })?.uri
     }
 }
 
@@ -100,29 +103,65 @@ private struct PlexResourcesResponse: Decodable {
 }
 
 private struct PlexMediaContainer: Decodable {
-    let devices: [PlexDevice]?
+    let devices: [PlexDevice]
 
     private enum CodingKeys: String, CodingKey {
         case devices = "Device"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let array = try? container.decode([PlexDevice].self, forKey: .devices) {
+            devices = array
+        } else if let single = try? container.decode(PlexDevice.self, forKey: .devices) {
+            devices = [single]
+        } else {
+            devices = []
+        }
     }
 }
 
 private struct PlexDevice: Decodable {
     let provides: String?
     let accessToken: String?
-    let connections: [PlexConnection]?
+    let connections: [PlexConnection]
 
     private enum CodingKeys: String, CodingKey {
         case provides
         case accessToken
         case connections = "Connection"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let provides = try? container.decode(String.self, forKey: .provides) {
+            self.provides = provides
+        } else if let providesArray = try? container.decode([String].self, forKey: .provides) {
+            self.provides = providesArray.joined(separator: ",")
+        } else {
+            self.provides = nil
+        }
+
+        if let accessToken = try? container.decode(String.self, forKey: .accessToken) {
+            self.accessToken = accessToken
+        } else {
+            self.accessToken = nil
+        }
+
+        if let array = try? container.decode([PlexConnection].self, forKey: .connections) {
+            connections = array
+        } else if let single = try? container.decode(PlexConnection.self, forKey: .connections) {
+            connections = [single]
+        } else {
+            connections = []
+        }
+    }
 }
 
 private struct PlexConnection: Decodable {
-    let uri: URL
-    let local: String?
-    let relay: String?
+    let uri: URL?
+    let isLocal: Bool
+    let isRelay: Bool
     let `protocol`: String?
 
     private enum CodingKeys: String, CodingKey {
@@ -132,11 +171,29 @@ private struct PlexConnection: Decodable {
         case `protocol` = "protocol"
     }
 
-    var isLocal: Bool {
-        local == "1"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let uriString = (try? container.decode(String.self, forKey: .uri)) ?? ""
+        uri = URL(string: uriString)
+        isLocal = PlexConnection.decodeBool(container: container, key: .local)
+        isRelay = PlexConnection.decodeBool(container: container, key: .relay)
+        `protocol` = try? container.decode(String.self, forKey: .protocol)
     }
 
     var isSecure: Bool {
-        uri.scheme == "https"
+        uri?.scheme == "https"
+    }
+
+    private static func decodeBool(container: KeyedDecodingContainer<CodingKeys>, key: CodingKeys) -> Bool {
+        if let bool = try? container.decode(Bool.self, forKey: key) {
+            return bool
+        }
+        if let intValue = try? container.decode(Int.self, forKey: key) {
+            return intValue == 1
+        }
+        if let string = try? container.decode(String.self, forKey: key) {
+            return string == "1" || string.lowercased() == "true"
+        }
+        return false
     }
 }
