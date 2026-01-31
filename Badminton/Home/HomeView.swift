@@ -5,13 +5,12 @@ import SwiftUI
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @StateObject private var searchModel = SearchViewModel()
-    @EnvironmentObject private var plexAuthManager: PlexAuthManager
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    plexSection
                     if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
@@ -39,6 +38,25 @@ struct HomeView: View {
             }
             .navigationTitle("Badminton")
             .searchable(text: $searchModel.query, placement: .toolbar, prompt: "Movies, TV, people")
+            .toolbar {
+                #if os(macOS)
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+                #else
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+                #endif
+            }
             .searchSuggestions {
                 let trimmed = searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty, !searchModel.history.isEmpty {
@@ -73,37 +91,8 @@ struct HomeView: View {
             .refreshable {
                 await viewModel.load(force: true)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var plexSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Plex")
-                .font(.title2.bold())
-
-            if plexAuthManager.isAuthenticated {
-                Text("Connected")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Button("Disconnect Plex") {
-                    plexAuthManager.signOut()
-                }
-                .buttonStyle(.bordered)
-            } else {
-                Text("Connect your Plex account to personalize this view.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Button(plexAuthManager.isAuthenticating ? "Connecting…" : "Connect Plex") {
-                    Task { await plexAuthManager.signIn() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(plexAuthManager.isAuthenticating)
-                if let errorMessage = plexAuthManager.errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
         }
     }
