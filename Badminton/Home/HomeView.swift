@@ -158,7 +158,7 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if !viewModel.plexRecentlyWatched.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
+                        HStack(alignment: .top, spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
                                 PosterCardView(
                                     title: item.title,
@@ -181,7 +181,7 @@ struct HomeView: View {
                 .font(.title2.bold())
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(alignment: .top, spacing: 16) {
                     ForEach(items, id: \.id) { item in
                         NavigationLink {
                             switch item {
@@ -213,7 +213,7 @@ struct HomeView: View {
                     .font(.title2.bold())
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 16) {
                         ForEach(items) { person in
                             NavigationLink {
                                 PersonDetailView(personID: person.id, name: person.name, profilePath: person.profilePath)
