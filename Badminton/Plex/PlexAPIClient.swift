@@ -8,35 +8,19 @@ final class PlexAPIClient {
     }
 
     func fetchRecentlyWatched(token: String, size: Int = 20) async throws -> PlexHistoryResult {
-        let resourceResponse = try await fetchResources(token: token)
-        guard let server = selectServer(from: resourceResponse) else {
-            throw URLError(.cannotFindHost)
-        }
+        let result = try await requestHistoryData(token: token, size: size)
+        let items = try parseHistoryItems(from: result.data, response: result.response)
+        return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
+    }
 
-        let serverToken = server.accessToken ?? token
-        let serverURL = server.baseURL
-
-        var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
-            URLQueryItem(name: "sort", value: "viewedAt:desc"),
-            URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
-            URLQueryItem(name: "X-Plex-Token", value: serverToken),
-            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
-            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
-        ]
-        let url = components?.url ?? serverURL.appendingPathComponent("status/sessions/history/all")
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
-        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
-        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        let items = try parseHistoryItems(from: data, response: http)
-        return PlexHistoryResult(items: items, serverBaseURL: serverURL, serverToken: serverToken)
+    func fetchRecentlyWatchedRaw(token: String, size: Int = 20) async throws -> PlexHistoryRawResult {
+        let result = try await requestHistoryData(token: token, size: size)
+        return PlexHistoryRawResult(
+            data: result.data,
+            response: result.response,
+            serverBaseURL: result.serverBaseURL,
+            serverToken: result.serverToken
+        )
     }
 
     private func fetchResources(token: String) async throws -> PlexResourcesResponse {
@@ -85,6 +69,37 @@ final class PlexAPIClient {
         return candidates.first(where: { $0.uri != nil })?.uri
     }
 
+    private func requestHistoryData(token: String, size: Int) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
+        let resourceResponse = try await fetchResources(token: token)
+        guard let server = selectServer(from: resourceResponse) else {
+            throw URLError(.cannotFindHost)
+        }
+
+        let serverToken = server.accessToken ?? token
+        let serverURL = server.baseURL
+
+        var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "sort", value: "viewedAt:desc"),
+            URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
+            URLQueryItem(name: "X-Plex-Token", value: serverToken),
+            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
+            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
+        ]
+        let url = components?.url ?? serverURL.appendingPathComponent("status/sessions/history/all")
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return (data, http, serverURL, serverToken)
+    }
+
     private func parseHistoryItems(from data: Data, response: HTTPURLResponse) throws -> [PlexHistoryItem] {
         do {
             return try PlexHistoryParser.parseJSON(data)
@@ -107,6 +122,13 @@ final class PlexAPIClient {
 
 struct PlexHistoryResult {
     let items: [PlexHistoryItem]
+    let serverBaseURL: URL
+    let serverToken: String
+}
+
+struct PlexHistoryRawResult {
+    let data: Data
+    let response: HTTPURLResponse
     let serverBaseURL: URL
     let serverToken: String
 }
