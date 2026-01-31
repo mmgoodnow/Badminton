@@ -469,11 +469,12 @@ final class HomeViewModel: ObservableObject {
                 return preferredAccountIDs.contains(accountID)
             }
 
-            let nowPlayingIDs = Set(nowPlayingItems.map { $0.id })
+            var nowPlayingSourceIDs: Set<String> = []
             let nowPlayingMapped: [PlexRecentlyWatchedItem] = nowPlayingItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
+                nowPlayingSourceIDs.insert(item.id)
                 let subtitle = item.displaySubtitle.isEmpty ? "Now Playing" : "Now Playing • \(item.displaySubtitle)"
                 return PlexRecentlyWatchedItem(
                     id: "now-\(item.id)",
@@ -494,7 +495,7 @@ final class HomeViewModel: ObservableObject {
                     imageURL: imageURL
                 )
             }
-            plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingIDs.contains($0.id) }
+            plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
