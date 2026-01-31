@@ -109,16 +109,39 @@ struct SettingsView: View {
         if plexAccounts.isLoading {
             ProgressView("Loading Plex accounts…")
         } else if !plexAccounts.accounts.isEmpty {
-            let selection = Binding<Int?>(
-                get: { plexAuthManager.preferredAccountID },
+            let selection = Binding<Set<Int>>(
+                get: { plexAuthManager.preferredAccountIDs },
                 set: { newValue in
-                    plexAuthManager.setPreferredAccountID(newValue)
+                    plexAuthManager.setPreferredAccountIDs(newValue)
                 }
             )
-            Picker("History Account", selection: selection) {
-                Text("All Accounts").tag(Int?.none)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("History Accounts")
+                    .font(.callout.weight(.semibold))
+                Text("Select one or more accounts. Leave none selected to show all.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 ForEach(plexAccounts.accounts) { account in
-                    Text(accountLabel(for: account)).tag(Optional(account.id))
+                    Toggle(isOn: Binding(
+                        get: { selection.wrappedValue.contains(account.id) },
+                        set: { isOn in
+                            var updated = selection.wrappedValue
+                            if isOn {
+                                updated.insert(account.id)
+                            } else {
+                                updated.remove(account.id)
+                            }
+                            selection.wrappedValue = updated
+                        }
+                    )) {
+                        Text(accountLabel(for: account))
+                    }
+                }
+                if !selection.wrappedValue.isEmpty {
+                    Button("Show All Accounts") {
+                        selection.wrappedValue = []
+                    }
+                    .buttonStyle(.link)
                 }
             }
         } else if let errorMessage = plexAccounts.errorMessage {

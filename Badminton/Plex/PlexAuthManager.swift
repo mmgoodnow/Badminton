@@ -19,8 +19,8 @@ final class PlexAuthManager: NSObject, ObservableObject {
     @Published var preferredServerName: String? {
         didSet { storage.save(preferredServerName, for: .preferredServerName) }
     }
-    @Published var preferredAccountID: Int? {
-        didSet { storage.save(preferredAccountID.map(String.init), for: .preferredAccountID) }
+    @Published var preferredAccountIDs: Set<Int> = [] {
+        didSet { storage.saveAccountIDs(preferredAccountIDs) }
     }
 
     private let session: URLSession
@@ -34,8 +34,10 @@ final class PlexAuthManager: NSObject, ObservableObject {
         isAuthenticated = authToken != nil
         preferredServerID = storage.read(.preferredServerID)
         preferredServerName = storage.read(.preferredServerName)
-        if let accountID = storage.read(.preferredAccountID) {
-            preferredAccountID = Int(accountID)
+        if let storedAccountIDs = storage.readAccountIDs() {
+            preferredAccountIDs = storedAccountIDs
+        } else if let accountID = storage.read(.preferredAccountID), let legacyID = Int(accountID) {
+            preferredAccountIDs = [legacyID]
         }
     }
 
@@ -66,8 +68,9 @@ final class PlexAuthManager: NSObject, ObservableObject {
         preferredServerName = nil
         storage.delete(.preferredServerID)
         storage.delete(.preferredServerName)
-        preferredAccountID = nil
         storage.delete(.preferredAccountID)
+        preferredAccountIDs = []
+        storage.delete(.preferredAccountIDs)
     }
 
     func setPreferredServer(id: String?, name: String?) {
@@ -75,8 +78,8 @@ final class PlexAuthManager: NSObject, ObservableObject {
         preferredServerName = name
     }
 
-    func setPreferredAccountID(_ id: Int?) {
-        preferredAccountID = id
+    func setPreferredAccountIDs(_ ids: Set<Int>) {
+        preferredAccountIDs = ids
     }
 
     private func createPin() async throws -> PlexPin {
@@ -274,6 +277,7 @@ private struct PlexTokenStore {
         case preferredServerID = "plex.server.id"
         case preferredServerName = "plex.server.name"
         case preferredAccountID = "plex.account.id"
+        case preferredAccountIDs = "plex.account.ids"
     }
 
     func save(_ value: String?, for key: Key) {
@@ -290,5 +294,24 @@ private struct PlexTokenStore {
 
     func delete(_ key: Key) {
         UserDefaults.standard.removeObject(forKey: key.rawValue)
+    }
+
+    func saveAccountIDs(_ ids: Set<Int>) {
+        delete(.preferredAccountID)
+        guard !ids.isEmpty else {
+            delete(.preferredAccountIDs)
+            return
+        }
+        let payload = Array(ids)
+        if let data = try? JSONEncoder().encode(payload) {
+            UserDefaults.standard.set(data, forKey: Key.preferredAccountIDs.rawValue)
+        }
+    }
+
+    func readAccountIDs() -> Set<Int>? {
+        guard let data = UserDefaults.standard.data(forKey: Key.preferredAccountIDs.rawValue),
+              let decoded = try? JSONDecoder().decode([Int].self, from: data)
+        else { return nil }
+        return Set(decoded)
     }
 }
