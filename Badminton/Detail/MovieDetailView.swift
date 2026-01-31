@@ -9,7 +9,7 @@ struct MovieDetailView: View {
 
     @StateObject private var viewModel: MovieDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
-    @State private var trailerLink: TrailerLink?
+    @Environment(\.openURL) private var openURL
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
         self.movieID = movieID
@@ -48,9 +48,6 @@ struct MovieDetailView: View {
 #endif
         .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss()
-        .sheet(item: $trailerLink) { link in
-            TrailerPlayerView(link: link)
-        }
         .task {
             await viewModel.load()
         }
@@ -138,7 +135,7 @@ struct MovieDetailView: View {
                     ForEach(viewModel.trailers) { trailer in
                         if let url = viewModel.videoURL(for: trailer) {
                             Button {
-                                trailerLink = TrailerLink(url: url, title: trailer.name)
+                                openURL(url)
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "play.circle.fill")
@@ -317,7 +314,7 @@ final class MovieDetailViewModel: ObservableObject {
 
     func videoURL(for video: TMDBVideo) -> URL? {
         if video.site.lowercased() == "youtube" {
-            return URL(string: "https://www.youtube.com/embed/\(video.key)?playsinline=1&autoplay=1")
+            return URL(string: "https://www.youtube.com/watch?v=\(video.key)")
         }
         return nil
     }
