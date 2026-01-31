@@ -67,13 +67,20 @@ final class PlexAPIClient {
 
     private func bestConnection(from connections: [PlexConnection]?) -> URL? {
         let candidates = connections ?? []
-        if let local = candidates.first(where: { $0.isLocal && $0.uri != nil }) {
+        let nonRelay = candidates.filter { !$0.isRelay && $0.uri != nil }
+        if let remoteSecure = nonRelay.first(where: { !$0.isLocal && $0.isSecure }) {
+            return remoteSecure.uri
+        }
+        if let remote = nonRelay.first(where: { !$0.isLocal }) {
+            return remote.uri
+        }
+        if let localSecure = nonRelay.first(where: { $0.isLocal && $0.isSecure }) {
+            return localSecure.uri
+        }
+        if let local = nonRelay.first(where: { $0.isLocal }) {
             return local.uri
         }
-        if let https = candidates.first(where: { !$0.isRelay && $0.isSecure && $0.uri != nil }) {
-            return https.uri
-        }
-        if let preferred = candidates.first(where: { !$0.isRelay && $0.uri != nil }) {
+        if let preferred = nonRelay.first {
             return preferred.uri
         }
         return candidates.first(where: { $0.uri != nil })?.uri
