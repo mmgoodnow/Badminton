@@ -222,12 +222,12 @@ private struct PosterCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .lineLimit(2)
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -252,20 +252,20 @@ private struct PersonCardView: View {
                         .scaledToFill()
                 }
             }
-            .frame(width: 120, height: 160)
+            .frame(width: 140, height: 200)
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
             Text(name)
-                .font(.subheadline.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .lineLimit(2)
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 120, alignment: .leading)
+        .frame(width: 140, alignment: .leading)
     }
 }
 

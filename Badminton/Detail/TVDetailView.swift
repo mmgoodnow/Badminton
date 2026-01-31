@@ -9,6 +9,7 @@ struct TVDetailView: View {
 
     @StateObject private var viewModel: TVDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
+    @State private var trailerLink: TrailerLink?
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
@@ -49,6 +50,9 @@ struct TVDetailView: View {
 #endif
         .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss()
+        .sheet(item: $trailerLink) { link in
+            TrailerPlayerView(link: link)
+        }
         .task {
             await viewModel.load()
         }
@@ -178,7 +182,9 @@ struct TVDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(viewModel.trailers) { trailer in
                         if let url = viewModel.videoURL(for: trailer) {
-                            Link(destination: url) {
+                            Button {
+                                trailerLink = TrailerLink(url: url, title: trailer.name)
+                            } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "play.circle.fill")
                                         .foregroundStyle(.secondary)

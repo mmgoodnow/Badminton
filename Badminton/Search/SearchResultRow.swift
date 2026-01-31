@@ -5,13 +5,13 @@ struct SearchResultRow: View {
     let item: TMDBSearchResultItem
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 14) {
             PosterThumb(url: posterURL)
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(item.displayTitle)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                     if item.mediaType != .unknown {
                         Text(item.mediaType.rawValue.uppercased())
                             .font(.caption.weight(.semibold))
@@ -24,13 +24,13 @@ struct SearchResultRow: View {
 
                 if let overview = item.overview, !overview.isEmpty {
                     Text(overview)
-                        .font(.footnote)
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
 
                 Text(item.subtitleText)
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
         }
@@ -63,7 +63,7 @@ private struct PosterThumb: View {
                     .scaledToFill()
             }
         }
-        .frame(width: 72, height: 108)
+        .frame(width: 90, height: 135)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
