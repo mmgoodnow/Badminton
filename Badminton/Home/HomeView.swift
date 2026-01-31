@@ -215,8 +215,9 @@ struct HomeView: View {
         ) {
             navigationPath.append(route)
         } else {
+            let fallbackQuery = item.seriesTitle ?? item.title
             await MainActor.run {
-                searchModel.query = item.title
+                searchModel.query = fallbackQuery
             }
         }
     }
@@ -595,6 +596,8 @@ final class HomeViewModel: ObservableObject {
             preferredServerID: preferredServerID
         )
         let typeHint = (metadata?.type ?? item.type)?.lowercased()
+        let isEpisode = typeHint == "episode"
+            || (item.seasonNumber != nil && item.episodeNumber != nil && item.seriesTitle != nil)
         var guidValues: [String] = []
         if let guid = metadata?.guid {
             guidValues.append(guid)
@@ -606,6 +609,7 @@ final class HomeViewModel: ObservableObject {
         if let route = try? await resolveViaGuids(
             guidValues,
             typeHint: typeHint,
+            isEpisode: isEpisode,
             item: item
         ) {
             plexRouteCache[item.ratingKey] = route
@@ -623,10 +627,11 @@ final class HomeViewModel: ObservableObject {
     private func resolveViaGuids(
         _ guids: [String],
         typeHint: String?,
+        isEpisode: Bool,
         item: PlexRecentlyWatchedItem
     ) async throws -> PlexNavigationRoute? {
         let parsed = parseExternalIDs(from: guids)
-        if let tmdbID = parsed.tmdbID, typeHint != "episode" {
+        if let tmdbID = parsed.tmdbID, !isEpisode {
             if typeHint == "movie" {
                 return .movie(id: tmdbID, title: item.title, posterPath: nil)
             }
@@ -661,7 +666,7 @@ final class HomeViewModel: ObservableObject {
         if typeHint == "movie", let movie = response.movieResults.first {
             return .movie(id: movie.id, title: movie.title, posterPath: movie.posterPath)
         }
-        if typeHint == "episode",
+        if (typeHint == "episode" || item.seasonNumber != nil),
            let episode = response.tvEpisodeResults.first,
            let showId = episode.showId,
            let seasonNumber = episode.seasonNumber ?? item.seasonNumber,
