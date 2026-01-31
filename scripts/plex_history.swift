@@ -40,7 +40,8 @@ struct PlexHistoryCLI {
 
         let envToken = ProcessInfo.processInfo.environment["PLEX_TOKEN"]
         let storedToken = UserDefaults(suiteName: bundleID)?.string(forKey: "plex.auth.token")
-        guard let authToken = token ?? envToken ?? storedToken, !authToken.isEmpty else {
+        let plistToken = readTokenFromPlist(bundleID: bundleID)
+        guard let authToken = token ?? envToken ?? storedToken ?? plistToken, !authToken.isEmpty else {
             print("Missing Plex token. Use --token or set PLEX_TOKEN.")
             printUsage()
             return
@@ -77,10 +78,30 @@ struct PlexHistoryCLI {
     }
 
     private static func printUsage() {
-        print("Usage:\n  swift scripts/plex_history.swift \\")
-        print("    Badminton/Plex/PlexAPIClient.swift \\")
-        print("    Badminton/Plex/PlexHistory.swift \\")
+        print("Usage:\n  swiftc -o /tmp/plex_history \\")
         print("    Badminton/Plex/PlexConfig.swift \\")
-        print("    [--token <PLEX_TOKEN>] [--size N] [--json] [--bundle-id <com.app.bundle>]\n")
+        print("    Badminton/Plex/PlexHistory.swift \\")
+        print("    Badminton/Plex/PlexAPIClient.swift \\")
+        print("    scripts/plex_history.swift\n")
+        print("  /tmp/plex_history [--token <PLEX_TOKEN>] [--size N] [--json] [--bundle-id <com.app.bundle>]\n")
+    }
+
+    private static func readTokenFromPlist(bundleID: String) -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let paths = [
+            "\(home)/Library/Containers/\(bundleID)/Data/Library/Preferences/\(bundleID).plist",
+            "\(home)/Library/Preferences/\(bundleID).plist"
+        ]
+
+        for path in paths {
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { continue }
+            if let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+               let token = plist["plex.auth.token"] as? String,
+               !token.isEmpty {
+                return token
+            }
+        }
+
+        return nil
     }
 }
