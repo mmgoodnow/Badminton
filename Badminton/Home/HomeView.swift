@@ -93,13 +93,22 @@ struct HomeView: View {
             .task(id: plexAuthManager.authToken) {
                 await viewModel.loadPlexHistory(
                     token: plexAuthManager.authToken,
-                    preferredServerID: plexAuthManager.preferredServerID
+                    preferredServerID: plexAuthManager.preferredServerID,
+                    preferredAccountID: plexAuthManager.preferredAccountID
                 )
             }
             .task(id: plexAuthManager.preferredServerID) {
                 await viewModel.loadPlexHistory(
                     token: plexAuthManager.authToken,
-                    preferredServerID: plexAuthManager.preferredServerID
+                    preferredServerID: plexAuthManager.preferredServerID,
+                    preferredAccountID: plexAuthManager.preferredAccountID
+                )
+            }
+            .task(id: plexAuthManager.preferredAccountID) {
+                await viewModel.loadPlexHistory(
+                    token: plexAuthManager.authToken,
+                    preferredServerID: plexAuthManager.preferredServerID,
+                    preferredAccountID: plexAuthManager.preferredAccountID
                 )
             }
             .refreshable {
@@ -362,6 +371,7 @@ final class HomeViewModel: ObservableObject {
     private var hasLoaded = false
     private var plexTokenLoaded: String?
     private var plexPreferredServerLoaded: String?
+    private var plexPreferredAccountLoaded: Int?
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -421,7 +431,7 @@ final class HomeViewModel: ObservableObject {
         isLoading = false
     }
 
-    func loadPlexHistory(token: String?, preferredServerID: String?) async {
+    func loadPlexHistory(token: String?, preferredServerID: String?, preferredAccountID: Int?) async {
         guard let token, !token.isEmpty else {
             plexRecentlyWatched = []
             plexTokenLoaded = nil
@@ -430,6 +440,7 @@ final class HomeViewModel: ObservableObject {
 
         guard plexTokenLoaded != token
             || plexPreferredServerLoaded != preferredServerID
+            || plexPreferredAccountLoaded != preferredAccountID
             || plexRecentlyWatched.isEmpty
         else { return }
 
@@ -437,10 +448,14 @@ final class HomeViewModel: ObservableObject {
         do {
             let result = try await plexClient.fetchRecentlyWatched(
                 token: token,
-                size: 20,
+                size: 500,
                 preferredServerID: preferredServerID
             )
-            plexRecentlyWatched = result.items.compactMap { item in
+            let filteredItems = result.items.filter { item in
+                guard let preferredAccountID else { return true }
+                return item.accountID == preferredAccountID
+            }
+            plexRecentlyWatched = filteredItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
@@ -453,6 +468,7 @@ final class HomeViewModel: ObservableObject {
             }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
+            plexPreferredAccountLoaded = preferredAccountID
         } catch {
             plexRecentlyWatched = []
             print("Plex history error: \(error)")

@@ -19,6 +19,9 @@ final class PlexAuthManager: NSObject, ObservableObject {
     @Published var preferredServerName: String? {
         didSet { storage.save(preferredServerName, for: .preferredServerName) }
     }
+    @Published var preferredAccountID: Int? {
+        didSet { storage.save(preferredAccountID.map(String.init), for: .preferredAccountID) }
+    }
 
     private let session: URLSession
     private var webAuthSession: ASWebAuthenticationSession?
@@ -31,6 +34,9 @@ final class PlexAuthManager: NSObject, ObservableObject {
         isAuthenticated = authToken != nil
         preferredServerID = storage.read(.preferredServerID)
         preferredServerName = storage.read(.preferredServerName)
+        if let accountID = storage.read(.preferredAccountID) {
+            preferredAccountID = Int(accountID)
+        }
     }
 
     func signIn() async {
@@ -60,11 +66,17 @@ final class PlexAuthManager: NSObject, ObservableObject {
         preferredServerName = nil
         storage.delete(.preferredServerID)
         storage.delete(.preferredServerName)
+        preferredAccountID = nil
+        storage.delete(.preferredAccountID)
     }
 
     func setPreferredServer(id: String?, name: String?) {
         preferredServerID = id
         preferredServerName = name
+    }
+
+    func setPreferredAccountID(_ id: Int?) {
+        preferredAccountID = id
     }
 
     private func createPin() async throws -> PlexPin {
@@ -261,6 +273,7 @@ private struct PlexTokenStore {
         case authToken = "plex.auth.token"
         case preferredServerID = "plex.server.id"
         case preferredServerName = "plex.server.name"
+        case preferredAccountID = "plex.account.id"
     }
 
     func save(_ value: String?, for key: Key) {

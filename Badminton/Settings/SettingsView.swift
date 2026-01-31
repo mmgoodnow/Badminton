@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @StateObject private var plexServers = PlexServerListViewModel()
+    @StateObject private var plexAccounts = PlexAccountListViewModel()
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,7 @@ struct SettingsView: View {
                                 Spacer()
                             }
                             serverPicker
+                            accountPicker
                             Button("Disconnect Plex", role: .destructive) {
                                 plexAuthManager.signOut()
                             }
@@ -57,6 +59,16 @@ struct SettingsView: View {
         }
         .task(id: plexAuthManager.authToken) {
             await plexServers.load(token: plexAuthManager.authToken)
+            await plexAccounts.load(
+                token: plexAuthManager.authToken,
+                preferredServerID: plexAuthManager.preferredServerID
+            )
+        }
+        .task(id: plexAuthManager.preferredServerID) {
+            await plexAccounts.load(
+                token: plexAuthManager.authToken,
+                preferredServerID: plexAuthManager.preferredServerID
+            )
         }
         .frame(minWidth: 360, minHeight: 320)
     }
@@ -87,6 +99,34 @@ struct SettingsView: View {
                 .foregroundStyle(.red)
         } else {
             Text("No Plex servers found.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var accountPicker: some View {
+        if plexAccounts.isLoading {
+            ProgressView("Loading Plex accounts…")
+        } else if !plexAccounts.accounts.isEmpty {
+            let selection = Binding<Int?>(
+                get: { plexAuthManager.preferredAccountID },
+                set: { newValue in
+                    plexAuthManager.setPreferredAccountID(newValue)
+                }
+            )
+            Picker("History Account", selection: selection) {
+                Text("All Accounts").tag(Int?.none)
+                ForEach(plexAccounts.accounts) { account in
+                    Text(account.displayName).tag(Optional(account.id))
+                }
+            }
+        } else if let errorMessage = plexAccounts.errorMessage {
+            Text(errorMessage)
+                .font(.footnote)
+                .foregroundStyle(.red)
+        } else {
+            Text("No recent Plex accounts found.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
