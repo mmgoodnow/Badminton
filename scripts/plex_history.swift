@@ -8,6 +8,7 @@ struct PlexHistoryCLI {
         var size = 20
         var jsonOutput = false
         var rawOutput = false
+        var rawResourcesOutput = false
         var bundleID = "com.bebopbeluga.Badminton"
 
         var i = 0
@@ -32,6 +33,8 @@ struct PlexHistoryCLI {
                 jsonOutput = true
             case "--raw":
                 rawOutput = true
+            case "--raw-resources":
+                rawResourcesOutput = true
             case "-h", "--help":
                 printUsage()
                 return
@@ -52,6 +55,17 @@ struct PlexHistoryCLI {
 
         let client = PlexAPIClient()
         do {
+            if rawResourcesOutput {
+                let result = try await client.fetchResourcesRaw(token: authToken)
+                let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
+                print("Resources Content-Type: \(contentType)")
+                if let body = String(data: result.data, encoding: .utf8) {
+                    print(body)
+                } else {
+                    print(result.data.base64EncodedString())
+                }
+                return
+            }
             if rawOutput {
                 let result = try await client.fetchRecentlyWatchedRaw(token: authToken, size: size)
                 let contentType = result.response.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
@@ -99,7 +113,7 @@ struct PlexHistoryCLI {
         print("    Badminton/Plex/PlexHistory.swift \\")
         print("    Badminton/Plex/PlexAPIClient.swift \\")
         print("    scripts/plex_history.swift\n")
-        print("  /tmp/plex_history [--token <PLEX_TOKEN>] [--size N] [--json] [--raw] [--bundle-id <com.app.bundle>]\n")
+        print("  /tmp/plex_history [--token <PLEX_TOKEN>] [--size N] [--json] [--raw] [--raw-resources] [--bundle-id <com.app.bundle>]\n")
     }
 
     private static func readTokenFromPlist(bundleID: String) -> String? {

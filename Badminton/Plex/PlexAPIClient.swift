@@ -23,7 +23,17 @@ final class PlexAPIClient {
         )
     }
 
+    func fetchResourcesRaw(token: String) async throws -> PlexResourcesRawResult {
+        let (data, response) = try await requestResourcesData(token: token)
+        return PlexResourcesRawResult(data: data, response: response)
+    }
+
     private func fetchResources(token: String) async throws -> PlexResourcesResponse {
+        let (data, _) = try await requestResourcesData(token: token)
+        return try JSONDecoder().decode(PlexResourcesResponse.self, from: data)
+    }
+
+    private func requestResourcesData(token: String) async throws -> (data: Data, response: HTTPURLResponse) {
         var components = URLComponents(string: "https://clients.plex.tv/api/v2/resources")
         components?.queryItems = [
             URLQueryItem(name: "includeHttps", value: "1"),
@@ -41,7 +51,7 @@ final class PlexAPIClient {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        return try JSONDecoder().decode(PlexResourcesResponse.self, from: data)
+        return (data, http)
     }
 
     private func selectServer(from response: PlexResourcesResponse) -> PlexServerCandidate? {
@@ -133,6 +143,11 @@ struct PlexHistoryRawResult {
     let serverToken: String
 }
 
+struct PlexResourcesRawResult {
+    let data: Data
+    let response: HTTPURLResponse
+}
+
 private struct PlexServerCandidate {
     let baseURL: URL
     let accessToken: String?
@@ -144,6 +159,16 @@ private struct PlexResourcesResponse: Decodable {
     private enum CodingKeys: String, CodingKey {
         case mediaContainer = "MediaContainer"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let devices = try? container.decode([PlexDevice].self) {
+            mediaContainer = PlexMediaContainer(devices: devices)
+            return
+        }
+        let keyed = try decoder.container(keyedBy: CodingKeys.self)
+        mediaContainer = try keyed.decode(PlexMediaContainer.self, forKey: .mediaContainer)
+    }
 }
 
 private struct PlexMediaContainer: Decodable {
@@ -151,6 +176,10 @@ private struct PlexMediaContainer: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case devices = "Device"
+    }
+
+    init(devices: [PlexDevice]) {
+        self.devices = devices
     }
 
     init(from decoder: Decoder) throws {
