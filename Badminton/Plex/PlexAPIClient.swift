@@ -13,6 +13,12 @@ final class PlexAPIClient {
         return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
     }
 
+    func fetchNowPlaying(token: String, preferredServerID: String? = nil) async throws -> PlexHistoryResult {
+        let result = try await requestSessionsData(token: token, preferredServerID: preferredServerID)
+        let items = try await parseHistoryItems(from: result.data, limit: 0)
+        return PlexHistoryResult(items: items, serverBaseURL: result.serverBaseURL, serverToken: result.serverToken)
+    }
+
     func fetchRecentlyWatchedRaw(token: String, size: Int = 20, preferredServerID: String? = nil) async throws -> PlexHistoryRawResult {
         let result = try await requestHistoryData(token: token, size: size, preferredServerID: preferredServerID)
         return PlexHistoryRawResult(
@@ -166,6 +172,29 @@ final class PlexAPIClient {
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
         request.setValue("\(start)", forHTTPHeaderField: "X-Plex-Container-Start")
         request.setValue("\(size)", forHTTPHeaderField: "X-Plex-Container-Size")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return (data, http, serverURL, serverToken)
+    }
+
+    private func requestSessionsData(token: String, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
+        let resourceResponse = try await fetchResources(token: token)
+        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
+            throw URLError(.cannotFindHost)
+        }
+
+        let serverToken = server.accessToken ?? token
+        let serverURL = server.baseURL
+        let url = serverURL.appendingPathComponent("status/sessions")
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

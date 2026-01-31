@@ -8,7 +8,7 @@ struct PlexHistoryResponse: Decodable {
     }
 
     private struct MediaContainer: Decodable {
-        let metadata: [PlexHistoryItem]
+        let metadata: [PlexHistoryItem]?
 
         private enum CodingKeys: String, CodingKey {
             case metadata = "Metadata"
@@ -18,7 +18,7 @@ struct PlexHistoryResponse: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let mediaContainer = try container.decode(MediaContainer.self, forKey: .mediaContainer)
-        items = mediaContainer.metadata
+        items = mediaContainer.metadata ?? []
     }
 }
 

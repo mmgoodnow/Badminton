@@ -451,12 +451,36 @@ final class HomeViewModel: ObservableObject {
                 size: 500,
                 preferredServerID: preferredServerID
             )
+            let nowPlayingResult = try? await plexClient.fetchNowPlaying(
+                token: token,
+                preferredServerID: preferredServerID
+            )
             let filteredItems = result.items.filter { item in
                 guard !preferredAccountIDs.isEmpty else { return true }
                 guard let accountID = item.accountID else { return false }
                 return preferredAccountIDs.contains(accountID)
             }
-            plexRecentlyWatched = filteredItems.compactMap { item in
+            let nowPlayingItems = (nowPlayingResult?.items ?? []).filter { item in
+                guard !preferredAccountIDs.isEmpty else { return true }
+                guard let accountID = item.accountID else { return false }
+                return preferredAccountIDs.contains(accountID)
+            }
+
+            let nowPlayingIDs = Set(nowPlayingItems.map { $0.id })
+            let nowPlayingMapped: [PlexRecentlyWatchedItem] = nowPlayingItems.compactMap { item in
+                guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
+                    return nil
+                }
+                let subtitle = item.displaySubtitle.isEmpty ? "Now Playing" : "Now Playing • \(item.displaySubtitle)"
+                return PlexRecentlyWatchedItem(
+                    id: "now-\(item.id)",
+                    title: item.displayTitle,
+                    subtitle: subtitle,
+                    imageURL: imageURL
+                )
+            }
+
+            let recentMapped: [PlexRecentlyWatchedItem] = filteredItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
@@ -467,6 +491,7 @@ final class HomeViewModel: ObservableObject {
                     imageURL: imageURL
                 )
             }
+            plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingIDs.contains($0.id) }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
