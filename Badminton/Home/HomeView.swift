@@ -626,12 +626,9 @@ final class HomeViewModel: ObservableObject {
         item: PlexRecentlyWatchedItem
     ) async throws -> PlexNavigationRoute? {
         let parsed = parseExternalIDs(from: guids)
-        if let tmdbID = parsed.tmdbID {
+        if let tmdbID = parsed.tmdbID, typeHint != "episode" {
             if typeHint == "movie" {
                 return .movie(id: tmdbID, title: item.title, posterPath: nil)
-            }
-            if typeHint == "episode" {
-                return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
             }
             return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
         }
