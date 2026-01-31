@@ -106,6 +106,21 @@ struct PlexHistoryItem: Decodable, Identifiable {
         grandparentThumb = attributes["grandparentThumb"]
     }
 
+    init(json: [String: Any]) {
+        var attributes: [String: String] = [:]
+        for (key, value) in json {
+            switch value {
+            case let stringValue as String:
+                attributes[key] = stringValue
+            case let numberValue as NSNumber:
+                attributes[key] = numberValue.stringValue
+            default:
+                continue
+            }
+        }
+        self.init(attributes: attributes)
+    }
+
     var displayTitle: String {
         switch type.lowercased() {
         case "episode":
@@ -180,7 +195,29 @@ enum PlexHistoryParser {
         if let array = try? decoder.decode([PlexHistoryItem].self, from: data) {
             return array
         }
-        return try decoder.decode(PlexHistoryResponse.self, from: data).items
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        if let dict = json as? [String: Any] {
+            if let media = dict["MediaContainer"] as? [String: Any] {
+                if let metadata = media["Metadata"] as? [[String: Any]] {
+                    return metadata.map { PlexHistoryItem(json: $0) }
+                }
+                if let metadata = media["Metadata"] as? [String: Any] {
+                    return [PlexHistoryItem(json: metadata)]
+                }
+            }
+            if let items = dict["items"] as? [[String: Any]] {
+                return items.map { PlexHistoryItem(json: $0) }
+            }
+        }
+        if let array = json as? [[String: Any]] {
+            return array.map { PlexHistoryItem(json: $0) }
+        }
+        throw DecodingError.dataCorrupted(
+            DecodingError.Context(
+                codingPath: [],
+                debugDescription: "Unsupported Plex history JSON format"
+            )
+        )
     }
 
     static func parseXML(_ data: Data) -> [PlexHistoryItem]? {
