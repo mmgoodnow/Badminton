@@ -24,8 +24,8 @@ struct PlexHistoryResponse: Decodable {
 
 struct PlexHistoryItem: Decodable, Identifiable {
     let ratingKey: String
-    let type: String
-    let title: String
+    let type: String?
+    let title: String?
     let grandparentTitle: String?
     let parentTitle: String?
     let index: Int?
@@ -51,23 +51,44 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case grandparentThumb
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let ratingKey = try? container.decode(String.self, forKey: .ratingKey) {
+            self.ratingKey = ratingKey
+        } else if let ratingKeyInt = try? container.decode(Int.self, forKey: .ratingKey) {
+            self.ratingKey = String(ratingKeyInt)
+        } else {
+            self.ratingKey = UUID().uuidString
+        }
+        type = try? container.decode(String.self, forKey: .type)
+        title = try? container.decode(String.self, forKey: .title)
+        grandparentTitle = try? container.decode(String.self, forKey: .grandparentTitle)
+        parentTitle = try? container.decode(String.self, forKey: .parentTitle)
+        index = try? container.decode(Int.self, forKey: .index)
+        parentIndex = try? container.decode(Int.self, forKey: .parentIndex)
+        year = try? container.decode(Int.self, forKey: .year)
+        thumb = try? container.decode(String.self, forKey: .thumb)
+        parentThumb = try? container.decode(String.self, forKey: .parentThumb)
+        grandparentThumb = try? container.decode(String.self, forKey: .grandparentThumb)
+    }
+
     var displayTitle: String {
-        switch type.lowercased() {
+        switch type?.lowercased() ?? "" {
         case "episode":
-            return grandparentTitle ?? title
+            return title ?? grandparentTitle ?? parentTitle ?? "Untitled"
         default:
-            return title
+            return title ?? grandparentTitle ?? parentTitle ?? "Untitled"
         }
     }
 
     var displaySubtitle: String {
-        switch type.lowercased() {
+        switch type?.lowercased() ?? "" {
         case "episode":
             var parts: [String] = []
             if let parentIndex, let index {
                 parts.append("S\(parentIndex)E\(index)")
             }
-            if !title.isEmpty {
+            if let title, !title.isEmpty {
                 parts.append(title)
             }
             return parts.joined(separator: " • ")
