@@ -99,7 +99,7 @@ final class PlexAPIClient {
 
     private func logParseFailure(data: Data, response: HTTPURLResponse, error: Error) {
         let contentType = response.value(forHTTPHeaderField: "Content-Type") ?? "unknown"
-        let prefix = String(data: data.prefix(400), encoding: .utf8) ?? "<non-utf8>"
+        let prefix = String(data: data.prefix(2000), encoding: .utf8) ?? "<non-utf8>"
         print("Plex history parse failed (\(contentType)): \(error)")
         print("Plex history response preview: \(prefix)")
     }
