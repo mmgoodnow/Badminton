@@ -173,7 +173,14 @@ struct PlexHistoryItem: Decodable, Identifiable {
 
 enum PlexHistoryParser {
     static func parseJSON(_ data: Data) throws -> [PlexHistoryItem] {
-        try JSONDecoder().decode(PlexHistoryResponse.self, from: data).items
+        let decoder = JSONDecoder()
+        if let response = try? decoder.decode(PlexHistoryResponse.self, from: data) {
+            return response.items
+        }
+        if let array = try? decoder.decode([PlexHistoryItem].self, from: data) {
+            return array
+        }
+        return try decoder.decode(PlexHistoryResponse.self, from: data).items
     }
 
     static func parseXML(_ data: Data) -> [PlexHistoryItem]? {
