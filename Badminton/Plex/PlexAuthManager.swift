@@ -32,11 +32,13 @@ final class PlexAuthManager: NSObject, ObservableObject {
 
         do {
             let pin = try await createPin()
-            try await beginWebAuthentication(url: makeAuthURL(pinCode: pin.code))
+            startWebAuthentication(url: makeAuthURL(pinCode: pin.code))
             let token = try await pollPin(id: pin.id)
             authToken = token
             isAuthenticated = true
             storage.save(token, for: .authToken)
+            webAuthSession?.cancel()
+            webAuthSession = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -54,9 +56,7 @@ final class PlexAuthManager: NSObject, ObservableObject {
         let url = components?.url ?? PlexConfig.pinBaseURL
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
-        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+        applyPlexHeaders(to: &request)
 
         let (data, response) = try await session.data(for: request)
         try Self.validate(response: response)
@@ -70,9 +70,7 @@ final class PlexAuthManager: NSObject, ObservableObject {
         while attempt < 90 {
             attempt += 1
             var request = URLRequest(url: url)
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
-            request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+            applyPlexHeaders(to: &request)
 
             let (data, response) = try await session.data(for: request)
             try Self.validate(response: response)
@@ -87,34 +85,30 @@ final class PlexAuthManager: NSObject, ObservableObject {
     }
 
     private func makeAuthURL(pinCode: String) -> URL {
-        var components = URLComponents(url: PlexConfig.authBaseURL, resolvingAgainstBaseURL: false)
-        components?.fragment = "!?"+Self.encodeQuery([
+        let params: [String: String] = [
             "clientID": PlexConfig.clientIdentifier,
             "code": pinCode,
-            "forwardUrl": PlexConfig.redirectURI,
             "context[device][product]": PlexConfig.productName,
+            "context[device][version]": Self.appVersion,
             "context[device][platform]": Self.platformName,
             "context[device][platformVersion]": ProcessInfo.processInfo.operatingSystemVersionString,
+            "context[device][device]": Self.deviceType,
             "context[device][deviceName]": Self.deviceName,
-        ])
-        return components?.url ?? PlexConfig.authBaseURL
+            "context[device][model]": Self.deviceModel,
+            "context[device][screenResolution]": Self.screenResolution,
+            "context[device][layout]": Self.layoutName,
+        ]
+        let urlString = "https://app.plex.tv/auth/#!?\(Self.encodeQuery(params))"
+        return URL(string: urlString) ?? PlexConfig.authBaseURL
     }
 
-    private func beginWebAuthentication(url: URL) async throws {
+    private func startWebAuthentication(url: URL) {
         let callbackScheme = URL(string: PlexConfig.redirectURI)?.scheme
-        return try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { _, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
-            session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = true
-            self.webAuthSession = session
-            session.start()
-        }
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { _, _ in }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        webAuthSession = session
+        session.start()
     }
 
     private static var platformName: String {
@@ -122,6 +116,30 @@ final class PlexAuthManager: NSObject, ObservableObject {
         return "macOS"
         #else
         return "iOS"
+        #endif
+    }
+
+    private static var deviceType: String {
+        #if os(macOS)
+        return "Mac"
+        #else
+        return UIDevice.current.model
+        #endif
+    }
+
+    private static var deviceModel: String {
+        #if os(macOS)
+        return "Mac"
+        #else
+        return UIDevice.current.model
+        #endif
+    }
+
+    private static var layoutName: String {
+        #if os(macOS)
+        return "desktop"
+        #else
+        return "mobile"
         #endif
     }
 
@@ -133,13 +151,35 @@ final class PlexAuthManager: NSObject, ObservableObject {
         #endif
     }
 
+    private static var screenResolution: String {
+        #if os(macOS)
+        guard let screen = NSScreen.main else { return "0x0" }
+        let scale = screen.backingScaleFactor
+        let width = Int(screen.frame.width * scale)
+        let height = Int(screen.frame.height * scale)
+        return "\(width)x\(height)"
+        #else
+        let bounds = UIScreen.main.nativeBounds
+        return "\(Int(bounds.width))x\(Int(bounds.height))"
+        #endif
+    }
+
+    private static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
     private static func encodeQuery(_ params: [String: String]) -> String {
         params.map { key, value in
-            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
-            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+            let escapedKey = Self.percentEncode(key)
+            let escapedValue = Self.percentEncode(value)
             return "\(escapedKey)=\(escapedValue)"
         }
         .joined(separator: "&")
+    }
+
+    private static func percentEncode(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.!~*'()"))
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
     private static func validate(response: URLResponse) throws {
@@ -147,6 +187,20 @@ final class PlexAuthManager: NSObject, ObservableObject {
         if !(200..<300).contains(http.statusCode) {
             throw PlexAuthError.badResponse(http.statusCode)
         }
+    }
+
+    private func applyPlexHeaders(to request: inout URLRequest) {
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(Self.appVersion, forHTTPHeaderField: "X-Plex-Version")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+        request.setValue(Self.deviceModel, forHTTPHeaderField: "X-Plex-Model")
+        request.setValue(Self.platformName, forHTTPHeaderField: "X-Plex-Platform")
+        request.setValue(ProcessInfo.processInfo.operatingSystemVersionString, forHTTPHeaderField: "X-Plex-Platform-Version")
+        request.setValue(Self.deviceType, forHTTPHeaderField: "X-Plex-Device")
+        request.setValue(Self.deviceName, forHTTPHeaderField: "X-Plex-Device-Name")
+        request.setValue(Self.screenResolution, forHTTPHeaderField: "X-Plex-Device-Screen-Resolution")
+        request.setValue(Locale.current.language.languageCode?.identifier ?? "en", forHTTPHeaderField: "X-Plex-Language")
     }
 }
 

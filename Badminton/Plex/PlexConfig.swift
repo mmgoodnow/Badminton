@@ -2,7 +2,7 @@ import Foundation
 
 enum PlexConfig {
     static let pinBaseURL = URL(string: "https://plex.tv/api/v2/pins")!
-    static let authBaseURL = URL(string: "https://app.plex.tv/auth")!
+    static let authBaseURL = URL(string: "https://app.plex.tv/auth/")!
     static let productName = "Badminton"
     static let redirectURI = "badminton://auth/plex"
 
