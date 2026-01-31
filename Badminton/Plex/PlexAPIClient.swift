@@ -118,17 +118,26 @@ final class PlexAPIClient {
         let start = 0
         let oneWeekAgo = Int(Date().addingTimeInterval(-7 * 24 * 60 * 60).timeIntervalSince1970)
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("status/sessions/history/all"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
+        var components = URLComponents()
+        components.queryItems = [
             URLQueryItem(name: "sort", value: "viewedAt:desc"),
-            URLQueryItem(name: "viewedAt", value: "viewedAt>=\(oneWeekAgo)"),
             URLQueryItem(name: "X-Plex-Container-Start", value: "\(start)"),
             URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
             URLQueryItem(name: "X-Plex-Token", value: serverToken),
             URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
             URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
         ]
-        let url = components?.url ?? serverURL.appendingPathComponent("status/sessions/history/all")
+        var encodedQuery = components.percentEncodedQuery ?? ""
+        if !encodedQuery.isEmpty {
+            encodedQuery.append("&")
+        }
+        encodedQuery.append("viewedAt>=\(oneWeekAgo)")
+        let baseURLString = serverURL.appendingPathComponent("status/sessions/history/all").absoluteString
+        let rawURLString = "\(baseURLString)?\(encodedQuery)"
+        let fallbackURLString = rawURLString.replacingOccurrences(of: "viewedAt>=", with: "viewedAt%3E%3D=")
+        let url = URL(string: rawURLString)
+            ?? URL(string: fallbackURLString)
+            ?? serverURL.appendingPathComponent("status/sessions/history/all")
         var request = URLRequest(url: url)
         request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Accept")
