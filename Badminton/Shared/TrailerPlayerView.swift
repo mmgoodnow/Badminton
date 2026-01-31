@@ -11,14 +11,31 @@ struct TrailerPlayerView: View {
     let link: TrailerLink
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @State private var playbackError = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.black
                     .ignoresSafeArea()
-                WebView(url: link.url)
+                WebView(url: link.url, playbackError: $playbackError)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if playbackError, let watchURL = watchURL {
+                    VStack(spacing: 12) {
+                        Text("This trailer can’t be embedded.")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Button("Open in YouTube") {
+                            openURL(watchURL)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(24)
+                    .background(Color.black.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
             }
             .navigationTitle(link.title)
 #if os(iOS)
@@ -28,6 +45,13 @@ struct TrailerPlayerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
+                if let watchURL = watchURL {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Open in YouTube") {
+                            openURL(watchURL)
+                        }
+                    }
+                }
             }
         }
         #if os(iOS)
@@ -36,41 +60,80 @@ struct TrailerPlayerView: View {
         .frame(minWidth: 900, minHeight: 600)
         #endif
     }
+
+    private var watchURL: URL? {
+        guard let id = youtubeEmbedID(from: link.url) else { return nil }
+        return URL(string: "https://www.youtube.com/watch?v=\(id)")
+    }
 }
 
 #if os(iOS)
 private struct WebView: UIViewRepresentable {
     let url: URL
+    @Binding var playbackError: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(playbackError: $playbackError)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.userContentController.add(context.coordinator, name: "youtubeError")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.allowsBackForwardNavigationGestures = true
         return view
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        loadContent(into: uiView, url: url)
+        if context.coordinator.lastLoadedURL != url {
+            playbackError = false
+            loadContent(into: uiView, url: url)
+            context.coordinator.lastLoadedURL = url
+        }
     }
 }
 #else
 private struct WebView: NSViewRepresentable {
     let url: URL
+    @Binding var playbackError: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(playbackError: $playbackError)
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(context.coordinator, name: "youtubeError")
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.allowsBackForwardNavigationGestures = true
         return view
     }
 
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        loadContent(into: nsView, url: url)
+        if context.coordinator.lastLoadedURL != url {
+            playbackError = false
+            loadContent(into: nsView, url: url)
+            context.coordinator.lastLoadedURL = url
+        }
     }
 }
 #endif
+
+private final class Coordinator: NSObject, WKScriptMessageHandler {
+    @Binding var playbackError: Bool
+    var lastLoadedURL: URL?
+
+    init(playbackError: Binding<Bool>) {
+        _playbackError = playbackError
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "youtubeError" else { return }
+        playbackError = true
+    }
+}
 
 private func loadContent(into webView: WKWebView, url: URL) {
     if let embedID = youtubeEmbedID(from: url) {
@@ -81,16 +144,33 @@ private func loadContent(into webView: WKWebView, url: URL) {
             <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" />
             <style>
               html, body { margin: 0; padding: 0; background: #000; height: 100%; }
-              iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+              #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
             </style>
           </head>
           <body>
-            <iframe
-              src=\"https://www.youtube.com/embed/\(embedID)?playsinline=1&autoplay=1&rel=0&modestbranding=1&origin=https://www.youtube.com\"
-              allow=\"autoplay; encrypted-media; picture-in-picture\"
-              allowfullscreen
-              referrerpolicy=\"origin\">
-            </iframe>
+            <div id=\"player\"></div>
+            <script src=\"https://www.youtube.com/iframe_api\"></script>
+            <script>
+              function onYouTubeIframeAPIReady() {
+                new YT.Player('player', {
+                  videoId: '\(embedID)',
+                  playerVars: {
+                    playsinline: 1,
+                    autoplay: 1,
+                    rel: 0,
+                    modestbranding: 1,
+                    origin: 'https://www.youtube.com'
+                  },
+                  events: {
+                    onError: function(event) {
+                      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.youtubeError) {
+                        window.webkit.messageHandlers.youtubeError.postMessage(event.data);
+                      }
+                    }
+                  }
+                });
+              }
+            </script>
           </body>
         </html>
         """
