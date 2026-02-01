@@ -712,15 +712,33 @@ final class HomeViewModel: ObservableObject {
                 token: token,
                 preferredServerID: preferredServerID
             )
-            let filteredItems = result.items.filter { item in
+            var preferredUsernames: Set<String> = []
+            if !preferredAccountIDs.isEmpty {
+                if let users = try? await plexClient.fetchHomeUsers(token: token) {
+                    preferredUsernames = Set(users
+                        .filter { preferredAccountIDs.contains($0.id) }
+                        .compactMap { $0.username ?? $0.title ?? $0.friendlyName }
+                        .map { $0.lowercased() }
+                    )
+                }
+            }
+            let matchesPreferredAccount: (PlexHistoryItem) -> Bool = { item in
                 guard !preferredAccountIDs.isEmpty else { return true }
-                guard let accountID = item.accountID ?? item.userID else { return false }
-                return preferredAccountIDs.contains(accountID)
+                if let accountID = item.accountID ?? item.userID,
+                   preferredAccountIDs.contains(accountID) {
+                    return true
+                }
+                if let userTitle = item.userTitle?.lowercased(),
+                   preferredUsernames.contains(userTitle) {
+                    return true
+                }
+                return false
+            }
+            let filteredItems = result.items.filter { item in
+                matchesPreferredAccount(item)
             }
             let nowPlayingItems = (nowPlayingResult?.items ?? []).filter { item in
-                guard !preferredAccountIDs.isEmpty else { return true }
-                guard let accountID = item.accountID ?? item.userID else { return false }
-                return preferredAccountIDs.contains(accountID)
+                matchesPreferredAccount(item)
             }
             var seenRatingKeys = Set<String>()
             let uniqueFilteredItems = filteredItems.filter { seenRatingKeys.insert($0.id).inserted }

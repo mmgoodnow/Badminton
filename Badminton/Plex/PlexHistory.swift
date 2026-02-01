@@ -36,6 +36,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let viewedAt: Int?
     let accountID: Int?
     let userID: Int?
+    let userTitle: String?
     let thumb: String?
     let parentThumb: String?
     let grandparentThumb: String?
@@ -57,6 +58,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case accountID
         case userID
         case user = "User"
+        case userTitle
         case thumb
         case parentThumb
         case grandparentThumb
@@ -103,6 +105,14 @@ struct PlexHistoryItem: Decodable, Identifiable {
             self.userID = userID
         } else {
             userID = nil
+        }
+        if let userTitle = try? container.decode(String.self, forKey: .userTitle) {
+            self.userTitle = userTitle
+        } else if let user = try? container.decode(PlexHistoryUser.self, forKey: .user),
+                  let title = user.title {
+            userTitle = title
+        } else {
+            userTitle = nil
         }
         thumb = try? container.decode(String.self, forKey: .thumb)
         parentThumb = try? container.decode(String.self, forKey: .parentThumb)
@@ -176,6 +186,8 @@ struct PlexHistoryItem: Decodable, Identifiable {
 
 private struct PlexHistoryUser: Decodable {
     let id: String?
+    let title: String?
+    let username: String?
 
     var intID: Int? {
         guard let id else { return nil }
