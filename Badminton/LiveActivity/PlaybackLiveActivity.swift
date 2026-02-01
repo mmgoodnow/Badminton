@@ -4,17 +4,6 @@ import Foundation
 #if os(iOS)
 import ActivityKit
 
-struct PlaybackActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
-        let title: String
-        let subtitle: String
-        let progress: Double
-        let updatedAt: Date
-    }
-
-    let id: String
-}
-
 @MainActor
 final class PlaybackLiveActivityManager: ObservableObject {
     @Published private(set) var status: String = "Idle"

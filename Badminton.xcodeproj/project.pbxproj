@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		462268F4F226E11F6B40F8D7 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 42E8FA4102AF1AE8E953C34F /* Kingfisher */; };
+		826787A9B2D3429599563741 /* BadmintonLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0C16C1FEBFBD4F51B735BDDC /* BadmintonLiveActivity.appex */; platformFilters = (ios, iosimulator, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FA369FAE18584A439C18FBF6 /* PlaybackActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D449061DCBE54A09B1961787 /* PlaybackActivityAttributes.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,14 +27,37 @@
 			remoteGlobalIDString = 51ED57992F2C9DF700321B63;
 			remoteInfo = Badminton;
 		};
+		D144767683FC426999B4CB31 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 51ED57922F2C9DF700321B63 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 269CEEDD91854699BF9AAC34;
+			remoteInfo = BadmintonLiveActivity;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5D0A1BB0485C42A1ACA7763F /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				826787A9B2D3429599563741 /* BadmintonLiveActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		51ED579A2F2C9DF700321B63 /* Badminton.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Badminton.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51ED57AB2F2C9DF800321B63 /* BadmintonTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BadmintonTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		51ED57B52F2C9DF800321B63 /* BadmintonUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BadmintonUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0C16C1FEBFBD4F51B735BDDC /* BadmintonLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = BadmintonLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BADC0FF1BADC0FF1BADC0FF1 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		BADC0FF2BADC0FF2BADC0FF2 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		D449061DCBE54A09B1961787 /* PlaybackActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Badminton/LiveActivity/PlaybackActivityAttributes.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -42,6 +67,13 @@
 				Info.plist,
 			);
 			target = 51ED57992F2C9DF700321B63 /* Badminton */;
+		};
+		6E19AB3AD5EE40929783099F /* Exceptions for "BadmintonLiveActivity" folder in "BadmintonLiveActivity" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 269CEEDD91854699BF9AAC34 /* BadmintonLiveActivity */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -62,6 +94,14 @@
 		51ED57B82F2C9DF800321B63 /* BadmintonUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BadmintonUITests;
+			sourceTree = "<group>";
+		};
+		1F84F5CA7F2A49FDBD2DBEB2 /* BadmintonLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6E19AB3AD5EE40929783099F /* Exceptions for "BadmintonLiveActivity" folder in "BadmintonLiveActivity" target */,
+			);
+			path = BadmintonLiveActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +129,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0D2B85B633A642B3B9DCE885 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -98,6 +145,7 @@
 				BADC0FF1BADC0FF1BADC0FF1 /* Config.xcconfig */,
 				BADC0FF2BADC0FF2BADC0FF2 /* Secrets.xcconfig */,
 				51ED579C2F2C9DF700321B63 /* Badminton */,
+				1F84F5CA7F2A49FDBD2DBEB2 /* BadmintonLiveActivity */,
 				51ED57AE2F2C9DF800321B63 /* BadmintonTests */,
 				51ED57B82F2C9DF800321B63 /* BadmintonUITests */,
 				51ED579B2F2C9DF700321B63 /* Products */,
@@ -108,6 +156,7 @@
 			isa = PBXGroup;
 			children = (
 				51ED579A2F2C9DF700321B63 /* Badminton.app */,
+				0C16C1FEBFBD4F51B735BDDC /* BadmintonLiveActivity.appex */,
 				51ED57AB2F2C9DF800321B63 /* BadmintonTests.xctest */,
 				51ED57B52F2C9DF800321B63 /* BadmintonUITests.xctest */,
 			);
@@ -124,10 +173,12 @@
 				51ED57962F2C9DF700321B63 /* Sources */,
 				51ED57972F2C9DF700321B63 /* Frameworks */,
 				51ED57982F2C9DF700321B63 /* Resources */,
+				5D0A1BB0485C42A1ACA7763F /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				713A100925D94A0FB0F1709E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				51ED579C2F2C9DF700321B63 /* Badminton */,
@@ -186,6 +237,28 @@
 			productReference = 51ED57B52F2C9DF800321B63 /* BadmintonUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		269CEEDD91854699BF9AAC34 /* BadmintonLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FFB62748BA5D4D9A91648368 /* Build configuration list for PBXNativeTarget "BadmintonLiveActivity" */;
+			buildPhases = (
+				108EC8C60E9E4941BAEDF39A /* Sources */,
+				0D2B85B633A642B3B9DCE885 /* Frameworks */,
+				619D9B21504F463FBAAEA527 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1F84F5CA7F2A49FDBD2DBEB2 /* BadmintonLiveActivity */,
+			);
+			name = BadmintonLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = BadmintonLiveActivity;
+			productReference = 0C16C1FEBFBD4F51B735BDDC /* BadmintonLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -206,6 +279,9 @@
 					51ED57B42F2C9DF800321B63 = {
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 51ED57992F2C9DF700321B63;
+					};
+					269CEEDD91854699BF9AAC34 = {
+						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
@@ -229,6 +305,7 @@
 				51ED57992F2C9DF700321B63 /* Badminton */,
 				51ED57AA2F2C9DF800321B63 /* BadmintonTests */,
 				51ED57B42F2C9DF800321B63 /* BadmintonUITests */,
+				269CEEDD91854699BF9AAC34 /* BadmintonLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -249,6 +326,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		51ED57B32F2C9DF800321B63 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		619D9B21504F463FBAAEA527 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -279,6 +363,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		108EC8C60E9E4941BAEDF39A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA369FAE18584A439C18FBF6 /* PlaybackActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -292,6 +384,12 @@
 			target = 51ED57992F2C9DF700321B63 /* Badminton */;
 			targetProxy = 51ED57B62F2C9DF800321B63 /* PBXContainerItemProxy */;
 		};
+		713A100925D94A0FB0F1709E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (ios, iosimulator, );
+			target = 269CEEDD91854699BF9AAC34 /* BadmintonLiveActivity */;
+			targetProxy = D144767683FC426999B4CB31 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -302,6 +400,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Badminton/Badminton.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = Badminton/Badminton-iOS.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Badminton/Badminton-iOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AFD89X85F4;
@@ -349,6 +449,8 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Badminton/Badminton.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = Badminton/Badminton-iOS.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = Badminton/Badminton-iOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AFD89X85F4;
@@ -386,6 +488,48 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
 				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		A6B0E530717645C4B64A6C28 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AFD89X85F4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BadmintonLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bebopbeluga.Badminton.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		637A5B83366E4750AFFF6D63 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AFD89X85F4;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BadmintonLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bebopbeluga.Badminton.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -642,6 +786,15 @@
 			buildConfigurations = (
 				51ED57C72F2C9DF800321B63 /* Debug */,
 				51ED57C82F2C9DF800321B63 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FFB62748BA5D4D9A91648368 /* Build configuration list for PBXNativeTarget "BadmintonLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6B0E530717645C4B64A6C28 /* Debug */,
+				637A5B83366E4750AFFF6D63 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
