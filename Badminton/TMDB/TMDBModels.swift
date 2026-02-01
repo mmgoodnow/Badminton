@@ -87,25 +87,6 @@ struct TMDBTVSeriesSummary: Decodable, Identifiable, Hashable {
     let originCountry: [String]?
 }
 
-struct TMDBFindResponse: Decodable, Hashable {
-    let movieResults: [TMDBMovieSummary]
-    let tvResults: [TMDBTVSeriesSummary]
-    let tvEpisodeResults: [TMDBTVEpisodeResult]
-
-    private enum CodingKeys: String, CodingKey {
-        case movieResults = "movie_results"
-        case tvResults = "tv_results"
-        case tvEpisodeResults = "tv_episode_results"
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        movieResults = (try? container.decode([TMDBMovieSummary].self, forKey: .movieResults)) ?? []
-        tvResults = (try? container.decode([TMDBTVSeriesSummary].self, forKey: .tvResults)) ?? []
-        tvEpisodeResults = (try? container.decode([TMDBTVEpisodeResult].self, forKey: .tvEpisodeResults)) ?? []
-    }
-}
-
 struct TMDBTVEpisodeResult: Decodable, Identifiable, Hashable {
     let id: Int
     let showId: Int?
