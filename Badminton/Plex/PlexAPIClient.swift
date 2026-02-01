@@ -71,6 +71,42 @@ final class PlexAPIClient {
         return try JSONDecoder().decode(PlexHomeUsersResponse.self, from: data).users
     }
 
+    func fetchUserAccount(id: Int, token: String) async throws -> PlexUserAccount? {
+        let url = URL(string: "https://plex.tv/api/users/\(id)")!
+        var request = URLRequest(url: url)
+        request.setValue("application/xml", forHTTPHeaderField: "Accept")
+        request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        if http.statusCode == 404 {
+            return nil
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return PlexUserAccountParser.parse(data: data)
+    }
+
+    func fetchCurrentUser(token: String) async throws -> PlexUserAccount? {
+        let url = URL(string: "https://plex.tv/users/account")!
+        var request = URLRequest(url: url)
+        request.setValue("application/xml", forHTTPHeaderField: "Accept")
+        request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
+        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return PlexUserAccountParser.parse(data: data)
+    }
+
     func fetchResourcesRaw(token: String) async throws -> PlexResourcesRawResult {
         let (data, response) = try await requestResourcesData(token: token)
         return PlexResourcesRawResult(data: data, response: response)
@@ -319,5 +355,61 @@ private struct PlexConnection: Decodable {
 
     var isSecure: Bool {
         uri?.scheme == "https"
+    }
+}
+
+struct PlexUserAccount: Hashable {
+    let id: Int
+    let title: String?
+    let username: String?
+
+    var displayName: String {
+        if let title, !title.isEmpty {
+            return title
+        }
+        if let username, !username.isEmpty {
+            return username
+        }
+        return "Account \(id)"
+    }
+
+    var nameVariants: Set<String> {
+        var variants: Set<String> = []
+        if let title, !title.isEmpty {
+            variants.insert(title)
+        }
+        if let username, !username.isEmpty {
+            variants.insert(username)
+        }
+        return variants
+    }
+}
+
+private final class PlexUserAccountParser: NSObject, XMLParserDelegate {
+    private var parsedUser: PlexUserAccount?
+
+    static func parse(data: Data) -> PlexUserAccount? {
+        let parser = XMLParser(data: data)
+        let delegate = PlexUserAccountParser()
+        parser.delegate = delegate
+        parser.parse()
+        return delegate.parsedUser
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String]
+    ) {
+        guard parsedUser == nil else { return }
+        if elementName.lowercased() == "user" {
+            if let idString = attributeDict["id"], let id = Int(idString) {
+                let title = attributeDict["title"]
+                let username = attributeDict["username"]
+                parsedUser = PlexUserAccount(id: id, title: title, username: username)
+            }
+        }
     }
 }
