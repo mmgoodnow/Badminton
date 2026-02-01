@@ -189,32 +189,35 @@ struct HomeView: View {
                 Text("Recently Watched on Plex")
                     .font(.title2.bold())
 
-                if viewModel.plexIsLoading && viewModel.plexRecentlyWatched.isEmpty {
+                let nowPlaying = viewModel.plexNowPlaying
+                let recent = viewModel.plexRecent
+                let hasItems = !nowPlaying.isEmpty || !recent.isEmpty
+
+                if viewModel.plexIsLoading && !hasItems {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: 16) {
-                            ForEach(0..<6, id: \.self) { _ in
-                                PlexPosterSkeleton()
-                            }
+                        VStack(alignment: .leading, spacing: 20) {
+                            plexSkeletonRow(title: "Now Playing")
+                            plexSkeletonRow(title: "Recent")
                         }
                         .padding(.vertical, 4)
                     }
-                } else if !viewModel.plexRecentlyWatched.isEmpty {
+                } else if !nowPlaying.isEmpty && !recent.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(alignment: .top, spacing: 16) {
-                            ForEach(viewModel.plexRecentlyWatched) { item in
-                                Button {
-                                    handlePlexSelection(item)
-                                } label: {
-                                    PosterCardView(
-                                        title: item.title,
-                                        subtitle: item.subtitle,
-                                        imageURL: item.imageURL
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
+                        VStack(alignment: .leading, spacing: 20) {
+                            plexRailRow(title: "Now Playing", items: nowPlaying)
+                            plexRailRow(title: "Recent", items: recent)
                         }
                         .padding(.vertical, 4)
+                    }
+                } else if !nowPlaying.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        plexRailRow(title: "Now Playing", items: nowPlaying)
+                            .padding(.vertical, 4)
+                    }
+                } else if !recent.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        plexRailRow(title: "Recent", items: recent)
+                            .padding(.vertical, 4)
                     }
                 }
             }
@@ -275,6 +278,40 @@ struct HomeView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+
+    private func plexRailRow(title: String, items: [PlexRecentlyWatchedItem]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(items) { item in
+                    Button {
+                        handlePlexSelection(item)
+                    } label: {
+                        PosterCardView(
+                            title: item.title,
+                            subtitle: item.subtitle,
+                            imageURL: item.imageURL
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func plexSkeletonRow(title: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .redacted(reason: .placeholder)
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(0..<6, id: \.self) { _ in
+                    PlexPosterSkeleton()
                 }
             }
         }
@@ -613,7 +650,8 @@ final class HomeViewModel: ObservableObject {
     @Published var onTheAirTV: [TMDBTVSeriesSummary] = []
     @Published var airingTodayTV: [TMDBTVSeriesSummary] = []
     @Published var popularPeople: [TMDBPersonSummary] = []
-    @Published var plexRecentlyWatched: [PlexRecentlyWatchedItem] = []
+    @Published var plexNowPlaying: [PlexRecentlyWatchedItem] = []
+    @Published var plexRecent: [PlexRecentlyWatchedItem] = []
     @Published var plexIsLoading = false
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -690,7 +728,8 @@ final class HomeViewModel: ObservableObject {
 
     func loadPlexHistory(token: String?, preferredServerID: String?, preferredAccountIDs: Set<Int>) async {
         guard let token, !token.isEmpty else {
-            plexRecentlyWatched = []
+            plexNowPlaying = []
+            plexRecent = []
             plexTokenLoaded = nil
             return
         }
@@ -698,7 +737,7 @@ final class HomeViewModel: ObservableObject {
         guard plexTokenLoaded != token
             || plexPreferredServerLoaded != preferredServerID
             || plexPreferredAccountLoaded != preferredAccountIDs
-            || plexRecentlyWatched.isEmpty
+            || (plexNowPlaying.isEmpty && plexRecent.isEmpty)
         else { return }
 
         plexIsLoading = true
@@ -789,13 +828,15 @@ final class HomeViewModel: ObservableObject {
                     showRatingKey: showRatingKey
                 )
             }
-            plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
+            plexNowPlaying = nowPlayingMapped
+            plexRecent = recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
             startPlexPrefetch(token: token, preferredServerID: preferredServerID)
         } catch {
-            plexRecentlyWatched = []
+            plexNowPlaying = []
+            plexRecent = []
             print("Plex history error: \(error)")
         }
         plexIsLoading = false
@@ -1108,8 +1149,9 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func startPlexPrefetch(token: String, preferredServerID: String?) {
-        guard !token.isEmpty, !plexRecentlyWatched.isEmpty else { return }
-        let candidates = Array(plexRecentlyWatched.prefix(25))
+        let combined = plexNowPlaying + plexRecent
+        guard !token.isEmpty, !combined.isEmpty else { return }
+        let candidates = Array(combined.prefix(25))
         var itemsToPrefetch: [PlexRecentlyWatchedItem] = []
         for item in candidates where !plexPrefetchedKeys.contains(item.ratingKey) {
             plexPrefetchedKeys.insert(item.ratingKey)
