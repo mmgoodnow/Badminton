@@ -191,14 +191,20 @@ struct HomeView: View {
                 let hasItems = !nowPlaying.isEmpty || !recent.isEmpty
 
                 if viewModel.plexIsLoading && !hasItems {
-                    HStack(alignment: .top, spacing: 24) {
-                        plexColumnSkeleton(title: "Now Playing")
-                        plexColumnSkeleton(title: "Recent")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 24) {
+                            plexColumnSkeleton(title: "Now Playing")
+                            plexColumnSkeleton(title: "Recent")
+                        }
+                        .padding(.vertical, 4)
                     }
                 } else if !nowPlaying.isEmpty && !recent.isEmpty {
-                    HStack(alignment: .top, spacing: 24) {
-                        plexRailColumn(title: "Now Playing", items: nowPlaying)
-                        plexRailColumn(title: "Recent", items: recent)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 24) {
+                            plexRailColumn(title: "Now Playing", items: nowPlaying)
+                            plexRailColumn(title: "Recent", items: recent)
+                        }
+                        .padding(.vertical, 4)
                     }
                 } else if !nowPlaying.isEmpty {
                     plexRailColumn(title: "Now Playing", items: nowPlaying)
