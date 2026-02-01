@@ -198,6 +198,7 @@ struct HomeView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                    .coordinateSpace(name: PlexRailCoordinateSpace.name)
                 } else if !nowPlaying.isEmpty && !recent.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 24) {
@@ -206,6 +207,7 @@ struct HomeView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                    .coordinateSpace(name: PlexRailCoordinateSpace.name)
                 } else if !nowPlaying.isEmpty {
                     plexRailColumn(title: "Now Playing", items: nowPlaying)
                 } else if !recent.isEmpty {
@@ -217,8 +219,7 @@ struct HomeView: View {
 
     private func plexRailColumn(title: String, items: [PlexRecentlyWatchedItem]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2.bold())
+            StickyPlexHeader(title: title)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(items) { item in
@@ -242,8 +243,7 @@ struct HomeView: View {
 
     private func plexColumnSkeleton(title: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2.bold())
+            StickyPlexHeader(title: title)
                 .redacted(reason: .placeholder)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
@@ -567,6 +567,42 @@ private struct PlexPosterSkeleton: View {
         }
         .redacted(reason: .placeholder)
         .frame(width: 140, alignment: .leading)
+    }
+}
+
+private enum PlexRailCoordinateSpace {
+    static let name = "PlexRailScroll"
+}
+
+private struct PlexHeaderMinXKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct StickyPlexHeader: View {
+    let title: String
+    @State private var minX: CGFloat = 0
+
+    var body: some View {
+        Text(title)
+            .font(.title2.bold())
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(
+                            key: PlexHeaderMinXKey.self,
+                            value: proxy.frame(in: .named(PlexRailCoordinateSpace.name)).minX
+                        )
+                }
+            )
+            .onPreferenceChange(PlexHeaderMinXKey.self) { value in
+                minX = value
+            }
+            .offset(x: max(0, -minX))
+            .zIndex(1)
     }
 }
 
