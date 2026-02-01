@@ -34,6 +34,9 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let year: Int?
     let originallyAvailableAt: String?
     let viewedAt: Int?
+    let duration: Int?
+    let viewOffset: Int?
+    let sessionKey: String?
     let accountID: Int?
     let userID: Int?
     let userTitle: String?
@@ -55,6 +58,9 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case year
         case originallyAvailableAt
         case viewedAt
+        case duration
+        case viewOffset
+        case sessionKey
         case accountID
         case userID
         case user = "User"
@@ -88,6 +94,27 @@ struct PlexHistoryItem: Decodable, Identifiable {
             self.viewedAt = Int(viewedAtString)
         } else {
             viewedAt = nil
+        }
+        if let duration = try? container.decode(Int.self, forKey: .duration) {
+            self.duration = duration
+        } else if let durationString = try? container.decode(String.self, forKey: .duration) {
+            self.duration = Int(durationString)
+        } else {
+            duration = nil
+        }
+        if let viewOffset = try? container.decode(Int.self, forKey: .viewOffset) {
+            self.viewOffset = viewOffset
+        } else if let viewOffsetString = try? container.decode(String.self, forKey: .viewOffset) {
+            self.viewOffset = Int(viewOffsetString)
+        } else {
+            viewOffset = nil
+        }
+        if let sessionKey = try? container.decode(String.self, forKey: .sessionKey) {
+            self.sessionKey = sessionKey
+        } else if let sessionKeyInt = try? container.decode(Int.self, forKey: .sessionKey) {
+            self.sessionKey = String(sessionKeyInt)
+        } else {
+            sessionKey = nil
         }
         if let accountID = try? container.decode(Int.self, forKey: .accountID) {
             self.accountID = accountID

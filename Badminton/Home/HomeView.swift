@@ -422,6 +422,7 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let type: String?
     let title: String
     let subtitle: String
+    let detailSubtitle: String
     let imageURL: URL
     let seriesTitle: String?
     let seasonNumber: Int?
@@ -429,10 +430,23 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let year: Int?
     let originallyAvailableAt: String?
     let showRatingKey: String?
+    let sessionKey: String?
+    let viewOffset: Int?
+    let duration: Int?
 
     var isEpisode: Bool {
         type?.lowercased() == "episode"
             || (seasonNumber != nil && episodeNumber != nil && seriesTitle != nil)
+    }
+
+    var progress: Double? {
+        guard let viewOffset, let duration, duration > 0 else { return nil }
+        let fraction = Double(viewOffset) / Double(duration)
+        return min(max(fraction, 0), 1)
+    }
+
+    var liveActivityID: String {
+        "plex-\(sessionKey ?? ratingKey)"
     }
 }
 
@@ -692,6 +706,9 @@ final class HomeViewModel: ObservableObject {
     private var plexPrefetchedKeys: Set<String> = []
     private var plexPrefetchTask: Task<Void, Never>?
     private let plexAccountResolver = PlexAccountResolver.shared
+#if os(iOS)
+    private let plexLiveActivityManager = PlexNowPlayingLiveActivityManager()
+#endif
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -763,6 +780,9 @@ final class HomeViewModel: ObservableObject {
             plexTokenLoaded = nil
             plexPreferredServerLoaded = nil
             plexPreferredAccountLoaded = []
+#if os(iOS)
+            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
             return
         }
 
@@ -803,7 +823,10 @@ final class HomeViewModel: ObservableObject {
             let uniqueFilteredItems = filteredItems.filter { seenRatingKeys.insert($0.id).inserted }
             let limitedFilteredItems = limitRecentEpisodes(items: uniqueFilteredItems)
             var seenNowPlaying = Set<String>()
-            let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
+            let uniqueNowPlayingItems = nowPlayingItems.filter { item in
+                let key = item.sessionKey ?? item.id
+                return seenNowPlaying.insert(key).inserted
+            }
 
             let nowPlayingBaseURL = nowPlayingResult?.serverBaseURL ?? result.serverBaseURL
             let nowPlayingToken = nowPlayingResult?.serverToken ?? result.serverToken
@@ -825,13 +848,17 @@ final class HomeViewModel: ObservableObject {
                     type: item.type,
                     title: display.title,
                     subtitle: display.subtitle,
+                    detailSubtitle: display.subtitle,
                     imageURL: imageURL,
                     seriesTitle: item.grandparentTitle,
                     seasonNumber: item.parentIndex,
                     episodeNumber: item.index,
                     year: item.year,
                     originallyAvailableAt: item.originallyAvailableAt,
-                    showRatingKey: showRatingKey
+                    showRatingKey: showRatingKey,
+                    sessionKey: nil,
+                    viewOffset: nil,
+                    duration: nil
                 )
             }
             plexNowPlaying = nowPlayingPayload.items
@@ -840,10 +867,16 @@ final class HomeViewModel: ObservableObject {
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
             startPlexPrefetch(token: token, preferredServerID: preferredServerID)
+#if os(iOS)
+            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
         } catch {
             plexNowPlaying = []
             plexRecent = []
             print("Plex history error: \(error)")
+#if os(iOS)
+            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
         }
         plexIsLoading = false
     }
@@ -855,6 +888,9 @@ final class HomeViewModel: ObservableObject {
     ) async {
         guard let token, !token.isEmpty else {
             plexNowPlaying = []
+#if os(iOS)
+            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
             return
         }
 
@@ -886,7 +922,10 @@ final class HomeViewModel: ObservableObject {
                 matchesPreferredAccount(item)
             }
             var seenNowPlaying = Set<String>()
-            let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
+            let uniqueNowPlayingItems = nowPlayingItems.filter { item in
+                let key = item.sessionKey ?? item.id
+                return seenNowPlaying.insert(key).inserted
+            }
             let nowPlayingPayload = mapNowPlayingItems(
                 items: uniqueNowPlayingItems,
                 serverBaseURL: nowPlayingResult.serverBaseURL,
@@ -894,6 +933,9 @@ final class HomeViewModel: ObservableObject {
             )
             plexNowPlaying = nowPlayingPayload.items
             plexRecent = plexRecent.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
+#if os(iOS)
+            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
         } catch {
             print("Plex now playing error: \(error)")
         }
@@ -943,18 +985,22 @@ final class HomeViewModel: ObservableObject {
             let subtitle = display.subtitle.isEmpty ? "Now Playing" : "Now Playing • \(display.subtitle)"
             let showRatingKey = parseRatingKey(from: item.grandparentKey)
             return PlexRecentlyWatchedItem(
-                id: "now-\(item.id)",
+                id: "now-\(item.sessionKey ?? item.id)",
                 ratingKey: item.id,
                 type: item.type,
                 title: display.title,
                 subtitle: subtitle,
+                detailSubtitle: display.subtitle,
                 imageURL: imageURL,
                 seriesTitle: item.grandparentTitle,
                 seasonNumber: item.parentIndex,
                 episodeNumber: item.index,
                 year: item.year,
                 originallyAvailableAt: item.originallyAvailableAt,
-                showRatingKey: showRatingKey
+                showRatingKey: showRatingKey,
+                sessionKey: item.sessionKey,
+                viewOffset: item.viewOffset,
+                duration: item.duration
             )
         }
         return (mapped, sourceIDs)

@@ -7,7 +7,8 @@ struct PlaybackActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         let title: String
         let subtitle: String
-        let progress: Double
+        let artworkURLString: String?
+        let progress: Double?
         let updatedAt: Date
     }
 

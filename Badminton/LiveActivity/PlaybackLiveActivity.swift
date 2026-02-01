@@ -38,6 +38,7 @@ final class PlaybackLiveActivityManager: ObservableObject {
         let state = PlaybackActivityAttributes.ContentState(
             title: "Badminton",
             subtitle: "Client-only Live Activity",
+            artworkURLString: nil,
             progress: progress,
             updatedAt: Date()
         )
@@ -72,6 +73,7 @@ final class PlaybackLiveActivityManager: ObservableObject {
         let state = PlaybackActivityAttributes.ContentState(
             title: "Badminton",
             subtitle: "Progress \(Int(progress * 100))%",
+            artworkURLString: nil,
             progress: progress,
             updatedAt: Date()
         )
@@ -97,6 +99,7 @@ final class PlaybackLiveActivityManager: ObservableObject {
         let state = PlaybackActivityAttributes.ContentState(
             title: "Badminton",
             subtitle: "Ended",
+            artworkURLString: nil,
             progress: progress,
             updatedAt: Date()
         )
