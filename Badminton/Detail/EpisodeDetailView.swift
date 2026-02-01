@@ -289,6 +289,7 @@ final class EpisodeDetailViewModel: ObservableObject {
             self.detail = detailResponse
             self.credits = creditsResponse
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

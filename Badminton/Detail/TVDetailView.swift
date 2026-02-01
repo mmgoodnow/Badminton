@@ -534,6 +534,7 @@ final class TVDetailViewModel: ObservableObject {
             }
 
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

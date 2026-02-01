@@ -331,6 +331,7 @@ final class PersonDetailViewModel: ObservableObject {
             self.detail = detailResponse
             applyCredits(cast: creditsResponse.cast, crew: creditsResponse.crew)
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

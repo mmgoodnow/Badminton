@@ -761,6 +761,7 @@ final class HomeViewModel: ObservableObject {
             airingTodayTV = airingTodayResponse.results
             self.popularPeople = popularPeopleResponse.results
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -870,6 +871,12 @@ final class HomeViewModel: ObservableObject {
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
+        } catch is CancellationError {
+            plexIsLoading = false
+            return
+        } catch let error as URLError where error.code == .cancelled {
+            plexIsLoading = false
+            return
         } catch {
             plexNowPlaying = []
             plexRecent = []
@@ -936,6 +943,10 @@ final class HomeViewModel: ObservableObject {
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
+        } catch is CancellationError {
+            return
+        } catch let error as URLError where error.code == .cancelled {
+            return
         } catch {
             print("Plex now playing error: \(error)")
         }

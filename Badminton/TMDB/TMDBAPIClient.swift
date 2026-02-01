@@ -61,6 +61,9 @@ struct TMDBAPIClient {
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
+            if error.code == .cancelled {
+                throw CancellationError()
+            }
             throw TMDBAPIError.network(host: request.url?.host ?? "unknown", code: error.code)
         }
         guard let httpResponse = response as? HTTPURLResponse else {

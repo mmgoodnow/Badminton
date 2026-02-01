@@ -233,6 +233,7 @@ final class TVSeasonDetailViewModel: ObservableObject {
             imageConfig = configResponse.images
             self.detail = detailResponse
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

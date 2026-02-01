@@ -300,6 +300,7 @@ final class MovieDetailViewModel: ObservableObject {
             self.credits = creditsResponse
             trailers = videosResponse.results.filter { $0.type == "Trailer" }
             hasLoaded = true
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }
