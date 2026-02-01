@@ -65,6 +65,7 @@ private struct LiveActivityContentView: View {
 
 private struct ArtworkView: View {
     let urlString: String?
+    @State private var didLogFailure = false
 
     var body: some View {
         let url = urlString.flatMap(URL.init(string:))
@@ -74,6 +75,13 @@ private struct ArtworkView: View {
                 image
                     .resizable()
                     .scaledToFill()
+            case .failure(let error):
+                if !didLogFailure {
+                    didLogFailure = true
+                    print("Live Activity artwork load failed: \(error.localizedDescription)")
+                }
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(.quaternary)
             default:
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(.quaternary)

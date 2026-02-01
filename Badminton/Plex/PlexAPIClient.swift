@@ -157,20 +157,29 @@ final class PlexAPIClient {
     private func bestConnection(from connections: [PlexConnection]?) -> URL? {
         let candidates = connections ?? []
         let nonRelay = candidates.filter { !$0.isRelay && $0.uri != nil }
-        if let remoteSecure = nonRelay.first(where: { !$0.isLocal && $0.isSecure }) {
-            return remoteSecure.uri
+        let plexDirect = nonRelay.filter { $0.isPlexDirect }
+
+        func pickBest(from list: [PlexConnection]) -> URL? {
+            if let remoteSecure = list.first(where: { !$0.isLocal && $0.isSecure }) {
+                return remoteSecure.uri
+            }
+            if let remote = list.first(where: { !$0.isLocal }) {
+                return remote.uri
+            }
+            if let localSecure = list.first(where: { $0.isLocal && $0.isSecure }) {
+                return localSecure.uri
+            }
+            if let local = list.first(where: { $0.isLocal }) {
+                return local.uri
+            }
+            return list.first?.uri
         }
-        if let remote = nonRelay.first(where: { !$0.isLocal }) {
-            return remote.uri
+
+        if let plexPreferred = pickBest(from: plexDirect) {
+            return plexPreferred
         }
-        if let localSecure = nonRelay.first(where: { $0.isLocal && $0.isSecure }) {
-            return localSecure.uri
-        }
-        if let local = nonRelay.first(where: { $0.isLocal }) {
-            return local.uri
-        }
-        if let preferred = nonRelay.first {
-            return preferred.uri
+        if let preferred = pickBest(from: nonRelay) {
+            return preferred
         }
         return candidates.first(where: { $0.uri != nil })?.uri
     }
@@ -355,6 +364,10 @@ private struct PlexConnection: Decodable {
 
     var isSecure: Bool {
         uri?.scheme == "https"
+    }
+
+    var isPlexDirect: Bool {
+        uri?.host?.hasSuffix(".plex.direct") == true
     }
 }
 
