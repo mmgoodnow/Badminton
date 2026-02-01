@@ -471,8 +471,6 @@ enum PlexResolveResult: Hashable {
 
 private struct PlexExternalIDs {
     var tmdbID: Int?
-    var imdbID: String?
-    var tvdbID: String?
 }
 
 private struct PosterCardView: View {
@@ -838,7 +836,7 @@ final class HomeViewModel: ObservableObject {
 
         if !showGuids.isEmpty {
             do {
-                if let tvID = try await resolveShowID(from: showGuids, item: item) {
+                if let tvID = try await resolveShowID(from: showGuids) {
                     if let showRatingKey {
                         plexShowIDCache[showRatingKey] = tvID
                     }
@@ -901,82 +899,13 @@ final class HomeViewModel: ObservableObject {
             return .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
         }
 
-        if let imdbID = parsed.imdbID {
-            if let route = try await resolveWithFind(externalID: imdbID, source: "imdb_id", typeHint: typeHint, item: item) {
-                return route
-            }
-        }
-
-        if let tvdbID = parsed.tvdbID {
-            if let route = try await resolveWithFind(externalID: tvdbID, source: "tvdb_id", typeHint: typeHint, item: item) {
-                return route
-            }
-        }
-
         return nil
     }
 
-    private func resolveShowID(from guids: [String], item: PlexRecentlyWatchedItem) async throws -> Int? {
+    private func resolveShowID(from guids: [String]) async throws -> Int? {
         let parsed = parseExternalIDs(from: guids)
         if let tmdbID = parsed.tmdbID {
             return tmdbID
-        }
-        if let imdbID = parsed.imdbID {
-            let response: TMDBFindResponse = try await client.getV3(
-                path: "/3/find/\(imdbID)",
-                queryItems: [URLQueryItem(name: "external_source", value: "imdb_id")]
-            )
-            if let tv = response.tvResults.first {
-                return tv.id
-            }
-        }
-        if let tvdbID = parsed.tvdbID {
-            let response: TMDBFindResponse = try await client.getV3(
-                path: "/3/find/\(tvdbID)",
-                queryItems: [URLQueryItem(name: "external_source", value: "tvdb_id")]
-            )
-            if let tv = response.tvResults.first {
-                return tv.id
-            }
-        }
-        return nil
-    }
-
-    private func resolveWithFind(
-        externalID: String,
-        source: String,
-        typeHint: String?,
-        item: PlexRecentlyWatchedItem
-    ) async throws -> PlexNavigationRoute? {
-        let response: TMDBFindResponse = try await client.getV3(
-            path: "/3/find/\(externalID)",
-            queryItems: [URLQueryItem(name: "external_source", value: source)]
-        )
-        if typeHint == "movie", let movie = response.movieResults.first {
-            return .movie(id: movie.id, title: movie.title, posterPath: movie.posterPath)
-        }
-        let hasEpisodeNumbers = item.seasonNumber != nil && item.episodeNumber != nil
-        if (typeHint == "episode" || hasEpisodeNumbers),
-           let episode = response.tvEpisodeResults.first,
-           let showId = episode.showId,
-           let seasonNumber = episode.seasonNumber ?? item.seasonNumber,
-           let episodeNumber = episode.episodeNumber ?? item.episodeNumber {
-            return .episode(
-                tvID: showId,
-                seasonNumber: seasonNumber,
-                episodeNumber: episodeNumber,
-                title: episode.name ?? item.title,
-                stillPath: episode.stillPath
-            )
-        }
-        if (typeHint == "episode" || hasEpisodeNumbers),
-           let tv = response.tvResults.first,
-           let seasonNumber = item.seasonNumber,
-           let episodeNumber = item.episodeNumber {
-            return .episode(tvID: tv.id, seasonNumber: seasonNumber, episodeNumber: episodeNumber, title: item.title, stillPath: nil)
-        }
-        if let tv = response.tvResults.first {
-            return .tv(id: tv.id, title: tv.name, posterPath: tv.posterPath)
         }
         return nil
     }
@@ -1038,10 +967,6 @@ final class HomeViewModel: ObservableObject {
         for guid in guids {
             if let tmdbID = extractExternalID(from: guid, prefixes: ["com.plexapp.agents.themoviedb://", "themoviedb://", "tmdb://"]) {
                 result.tmdbID = Int(tmdbID)
-            } else if let imdbID = extractExternalID(from: guid, prefixes: ["imdb://", "com.plexapp.agents.imdb://"]) {
-                result.imdbID = imdbID
-            } else if let tvdbID = extractExternalID(from: guid, prefixes: ["thetvdb://", "tvdb://", "com.plexapp.agents.thetvdb://"]) {
-                result.tvdbID = tvdbID
             }
         }
         return result
