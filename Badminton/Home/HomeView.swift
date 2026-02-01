@@ -781,6 +781,7 @@ final class HomeViewModel: ObservableObject {
             }
             var seenRatingKeys = Set<String>()
             let uniqueFilteredItems = filteredItems.filter { seenRatingKeys.insert($0.id).inserted }
+            let limitedFilteredItems = limitRecentEpisodes(items: uniqueFilteredItems)
             var seenNowPlaying = Set<String>()
             let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
 
@@ -809,7 +810,7 @@ final class HomeViewModel: ObservableObject {
                 )
             }
 
-            let recentMapped: [PlexRecentlyWatchedItem] = uniqueFilteredItems.compactMap { item in
+            let recentMapped: [PlexRecentlyWatchedItem] = limitedFilteredItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
@@ -1148,6 +1149,22 @@ final class HomeViewModel: ObservableObject {
         let trimmed = key.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let parts = trimmed.split(separator: "/")
         return parts.last.map(String.init)
+    }
+
+    private func limitRecentEpisodes(items: [PlexHistoryItem], limitPerShow: Int = 3) -> [PlexHistoryItem] {
+        var episodeCounts: [String: Int] = [:]
+        return items.filter { item in
+            guard item.type?.lowercased() == "episode" else { return true }
+            let key = item.grandparentKey
+                ?? item.grandparentTitle
+                ?? item.parentTitle
+                ?? item.title
+                ?? item.id
+            let count = episodeCounts[key, default: 0]
+            guard count < limitPerShow else { return false }
+            episodeCounts[key] = count + 1
+            return true
+        }
     }
 
     private func plexDisplayInfo(for item: PlexHistoryItem) -> (title: String, subtitle: String) {
