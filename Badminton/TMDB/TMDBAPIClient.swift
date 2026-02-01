@@ -72,7 +72,11 @@ struct TMDBAPIClient {
             }
             throw TMDBAPIError.httpStatus(httpResponse.statusCode)
         }
-        return try decoder.decode(T.self, from: data)
+        return try await Task.detached(priority: .userInitiated) {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            return try decoder.decode(T.self, from: data)
+        }.value
     }
 }
 
