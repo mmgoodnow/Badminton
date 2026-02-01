@@ -714,12 +714,12 @@ final class HomeViewModel: ObservableObject {
             )
             let filteredItems = result.items.filter { item in
                 guard !preferredAccountIDs.isEmpty else { return true }
-                guard let accountID = item.accountID else { return false }
+                guard let accountID = item.accountID ?? item.userID else { return false }
                 return preferredAccountIDs.contains(accountID)
             }
             let nowPlayingItems = (nowPlayingResult?.items ?? []).filter { item in
                 guard !preferredAccountIDs.isEmpty else { return true }
-                guard let accountID = item.accountID else { return false }
+                guard let accountID = item.accountID ?? item.userID else { return false }
                 return preferredAccountIDs.contains(accountID)
             }
             var seenRatingKeys = Set<String>()

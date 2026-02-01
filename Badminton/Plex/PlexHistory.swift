@@ -35,6 +35,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let originallyAvailableAt: String?
     let viewedAt: Int?
     let accountID: Int?
+    let userID: Int?
     let thumb: String?
     let parentThumb: String?
     let grandparentThumb: String?
@@ -54,6 +55,8 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case originallyAvailableAt
         case viewedAt
         case accountID
+        case userID
+        case user = "User"
         case thumb
         case parentThumb
         case grandparentThumb
@@ -90,6 +93,16 @@ struct PlexHistoryItem: Decodable, Identifiable {
             self.accountID = Int(accountIDString)
         } else {
             accountID = nil
+        }
+        if let userID = try? container.decode(Int.self, forKey: .userID) {
+            self.userID = userID
+        } else if let userIDString = try? container.decode(String.self, forKey: .userID) {
+            self.userID = Int(userIDString)
+        } else if let user = try? container.decode(PlexHistoryUser.self, forKey: .user),
+                  let userID = user.intID {
+            self.userID = userID
+        } else {
+            userID = nil
         }
         thumb = try? container.decode(String.self, forKey: .thumb)
         parentThumb = try? container.decode(String.self, forKey: .parentThumb)
@@ -158,6 +171,15 @@ struct PlexHistoryItem: Decodable, Identifiable {
         }
         return URL(string: "https://metadata-static.plex.tv")?
             .appendingPathComponent(path)
+    }
+}
+
+private struct PlexHistoryUser: Decodable {
+    let id: String?
+
+    var intID: Int? {
+        guard let id else { return nil }
+        return Int(id)
     }
 }
 
