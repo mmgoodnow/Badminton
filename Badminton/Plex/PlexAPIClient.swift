@@ -289,7 +289,7 @@ private struct PlexDevice: Decodable {
     let accessToken: String?
     let owned: Bool?
     let lastSeenAt: String?
-    let connections: [PlexConnection]
+    let connections: [PlexConnection]?
 
     private enum CodingKeys: String, CodingKey {
         case name
