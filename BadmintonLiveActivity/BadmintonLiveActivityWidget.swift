@@ -49,6 +49,7 @@ private struct LiveActivityContentView: View {
             ProgressView(value: context.state.progress)
                 .progressViewStyle(.linear)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }

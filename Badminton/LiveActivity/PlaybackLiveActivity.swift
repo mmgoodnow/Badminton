@@ -11,6 +11,17 @@ final class PlaybackLiveActivityManager: ObservableObject {
     private var activity: Activity<PlaybackActivityAttributes>?
     private var progress: Double = 0.1
 
+    private func resolveActivity() -> Activity<PlaybackActivityAttributes>? {
+        if let activity {
+            return activity
+        }
+        let existing = Activity<PlaybackActivityAttributes>.activities.first
+        if let existing {
+            activity = existing
+        }
+        return existing
+    }
+
     func startSample() {
         guard #available(iOS 16.1, *) else {
             status = "Live Activities require iOS 16.1+"
@@ -52,7 +63,7 @@ final class PlaybackLiveActivityManager: ObservableObject {
             status = "Live Activities require iOS 16.1+"
             return
         }
-        guard let activity else {
+        guard let activity = resolveActivity() else {
             status = "No active Live Activity"
             return
         }
@@ -78,7 +89,7 @@ final class PlaybackLiveActivityManager: ObservableObject {
             status = "Live Activities require iOS 16.1+"
             return
         }
-        guard let activity else {
+        guard let activity = resolveActivity() else {
             status = "No active Live Activity"
             return
         }
