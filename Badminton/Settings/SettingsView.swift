@@ -5,6 +5,9 @@ struct SettingsView: View {
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @StateObject private var plexServers = PlexServerListViewModel()
     @StateObject private var plexAccounts = PlexAccountListViewModel()
+#if os(iOS)
+    @StateObject private var liveActivity = PlaybackLiveActivityManager()
+#endif
 
     var body: some View {
         NavigationStack {
@@ -46,6 +49,28 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                 }
+#if os(iOS)
+                Section("Live Activity (Debug)") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(liveActivity.status)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Button("Start") {
+                                liveActivity.startSample()
+                            }
+                            Button("Update") {
+                                liveActivity.updateSample()
+                            }
+                            Button("End") {
+                                liveActivity.endSample()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.vertical, 4)
+                }
+#endif
             }
             .formStyle(.grouped)
             .navigationTitle("Settings")
@@ -141,7 +166,11 @@ struct SettingsView: View {
                     Button("Show All Accounts") {
                         selection.wrappedValue = []
                     }
+#if os(macOS)
                     .buttonStyle(.link)
+#else
+                    .buttonStyle(.borderless)
+#endif
                 }
             }
         } else if let errorMessage = plexAccounts.errorMessage {
