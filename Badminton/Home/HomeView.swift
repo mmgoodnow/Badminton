@@ -302,6 +302,12 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let episodeNumber: Int?
     let year: Int?
     let originallyAvailableAt: String?
+    let showRatingKey: String?
+
+    var isEpisode: Bool {
+        type?.lowercased() == "episode"
+            || (seasonNumber != nil && episodeNumber != nil && seriesTitle != nil)
+    }
 }
 
 private struct PlexResolveView: View {
@@ -565,6 +571,8 @@ final class HomeViewModel: ObservableObject {
     private var plexPreferredAccountLoaded: Set<Int> = []
     private var plexRouteCache: [String: PlexNavigationRoute] = [:]
     private var plexShowIDCache: [String: Int] = [:]
+    private var plexPrefetchedKeys: Set<String> = []
+    private var plexPrefetchTask: Task<Void, Never>?
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -670,6 +678,7 @@ final class HomeViewModel: ObservableObject {
                 }
                 nowPlayingSourceIDs.insert(item.id)
                 let subtitle = item.displaySubtitle.isEmpty ? "Now Playing" : "Now Playing • \(item.displaySubtitle)"
+                let showRatingKey = parseRatingKey(from: item.grandparentKey)
                 return PlexRecentlyWatchedItem(
                     id: "now-\(item.id)",
                     ratingKey: item.id,
@@ -681,7 +690,8 @@ final class HomeViewModel: ObservableObject {
                     seasonNumber: item.parentIndex,
                     episodeNumber: item.index,
                     year: item.year,
-                    originallyAvailableAt: item.originallyAvailableAt
+                    originallyAvailableAt: item.originallyAvailableAt,
+                    showRatingKey: showRatingKey
                 )
             }
 
@@ -689,6 +699,7 @@ final class HomeViewModel: ObservableObject {
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
+                let showRatingKey = parseRatingKey(from: item.grandparentKey)
                 return PlexRecentlyWatchedItem(
                     id: item.id,
                     ratingKey: item.id,
@@ -700,13 +711,15 @@ final class HomeViewModel: ObservableObject {
                     seasonNumber: item.parentIndex,
                     episodeNumber: item.index,
                     year: item.year,
-                    originallyAvailableAt: item.originallyAvailableAt
+                    originallyAvailableAt: item.originallyAvailableAt,
+                    showRatingKey: showRatingKey
                 )
             }
             plexRecentlyWatched = nowPlayingMapped + recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
+            startPlexPrefetch(token: token, preferredServerID: preferredServerID)
         } catch {
             plexRecentlyWatched = []
             print("Plex history error: \(error)")
@@ -717,6 +730,22 @@ final class HomeViewModel: ObservableObject {
     func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexResolveResult {
         if let cached = plexRouteCache[item.ratingKey] {
             return .success(cached)
+        }
+
+        if item.isEpisode,
+           let showRatingKey = item.showRatingKey,
+           let cachedShowID = plexShowIDCache[showRatingKey],
+           let seasonNumber = item.seasonNumber,
+           let episodeNumber = item.episodeNumber {
+            let route = PlexNavigationRoute.episode(
+                tvID: cachedShowID,
+                seasonNumber: seasonNumber,
+                episodeNumber: episodeNumber,
+                title: item.title,
+                stillPath: nil
+            )
+            plexRouteCache[item.ratingKey] = route
+            return .success(route)
         }
 
         var metadata: PlexMetadataItem?
@@ -731,8 +760,7 @@ final class HomeViewModel: ObservableObject {
             metadataError = error.localizedDescription
         }
         let typeHint = (metadata?.type ?? item.type)?.lowercased()
-        let isEpisode = typeHint == "episode"
-            || (item.seasonNumber != nil && item.episodeNumber != nil && item.seriesTitle != nil)
+        let isEpisode = typeHint == "episode" || item.isEpisode
         var notes: [String] = []
         if let metadataError {
             notes.append("Plex metadata: \(metadataError)")
@@ -748,7 +776,7 @@ final class HomeViewModel: ObservableObject {
             )
         }
 
-        let guidValues = extractGuids(from: metadata)
+        let guidValues = Self.extractGuids(from: metadata)
         if !guidValues.isEmpty {
             do {
                 if let route = try await resolveViaGuids(
@@ -803,7 +831,8 @@ final class HomeViewModel: ObservableObject {
             episodeNotes.append("Episode numbers missing in Plex history.")
             return await resolveEpisodeFallback(item: item, notes: episodeNotes)
         }
-        if let showRatingKey = metadata?.grandparentRatingKey,
+        let showRatingKey = item.showRatingKey ?? metadata?.grandparentRatingKey
+        if let showRatingKey,
            let cachedShowID = plexShowIDCache[showRatingKey] {
             let route = PlexNavigationRoute.episode(
                 tvID: cachedShowID,
@@ -817,16 +846,14 @@ final class HomeViewModel: ObservableObject {
         }
 
         var showGuids: [String] = []
-        var showRatingKey: String?
-        if let grandparentRatingKey = metadata?.grandparentRatingKey {
-            showRatingKey = grandparentRatingKey
+        if let showRatingKey {
             do {
                 let showMetadata = try await plexClient.fetchMetadata(
-                    ratingKey: grandparentRatingKey,
+                    ratingKey: showRatingKey,
                     token: token,
                     preferredServerID: preferredServerID
                 )
-                showGuids = extractGuids(from: showMetadata)
+                showGuids = Self.extractGuids(from: showMetadata)
             } catch {
                 episodeNotes.append("Show metadata: \(error.localizedDescription)")
             }
@@ -891,7 +918,7 @@ final class HomeViewModel: ObservableObject {
         isEpisode: Bool,
         item: PlexRecentlyWatchedItem
     ) async throws -> PlexNavigationRoute? {
-        let parsed = parseExternalIDs(from: guids)
+        let parsed = Self.parseExternalIDs(from: guids)
         if let tmdbID = parsed.tmdbID, !isEpisode {
             if typeHint == "movie" {
                 return .movie(id: tmdbID, title: item.title, posterPath: nil)
@@ -903,7 +930,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func resolveShowID(from guids: [String]) async throws -> Int? {
-        let parsed = parseExternalIDs(from: guids)
+        let parsed = Self.parseExternalIDs(from: guids)
         if let tmdbID = parsed.tmdbID {
             return tmdbID
         }
@@ -962,7 +989,7 @@ final class HomeViewModel: ObservableObject {
         return items
     }
 
-    private func parseExternalIDs(from guids: [String]) -> PlexExternalIDs {
+    private static func parseExternalIDs(from guids: [String]) -> PlexExternalIDs {
         var result = PlexExternalIDs()
         for guid in guids {
             if let tmdbID = extractExternalID(from: guid, prefixes: ["com.plexapp.agents.themoviedb://", "themoviedb://", "tmdb://"]) {
@@ -972,7 +999,7 @@ final class HomeViewModel: ObservableObject {
         return result
     }
 
-    private func extractGuids(from metadata: PlexMetadataItem?) -> [String] {
+    private static func extractGuids(from metadata: PlexMetadataItem?) -> [String] {
         guard let metadata else { return [] }
         var guidValues: [String] = []
         if let guid = metadata.guid {
@@ -984,7 +1011,7 @@ final class HomeViewModel: ObservableObject {
         return guidValues
     }
 
-    private func extractExternalID(from guid: String, prefixes: [String]) -> String? {
+    private static func extractExternalID(from guid: String, prefixes: [String]) -> String? {
         let lower = guid.lowercased()
         for prefix in prefixes {
             if let range = lower.range(of: prefix) {
@@ -997,6 +1024,63 @@ final class HomeViewModel: ObservableObject {
             }
         }
         return nil
+    }
+
+    private func parseRatingKey(from key: String?) -> String? {
+        guard let key else { return nil }
+        let trimmed = key.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let parts = trimmed.split(separator: "/")
+        return parts.last.map(String.init)
+    }
+
+    private func startPlexPrefetch(token: String, preferredServerID: String?) {
+        guard !token.isEmpty, !plexRecentlyWatched.isEmpty else { return }
+        let candidates = Array(plexRecentlyWatched.prefix(25))
+        var itemsToPrefetch: [PlexRecentlyWatchedItem] = []
+        for item in candidates where !plexPrefetchedKeys.contains(item.ratingKey) {
+            plexPrefetchedKeys.insert(item.ratingKey)
+            itemsToPrefetch.append(item)
+        }
+        guard !itemsToPrefetch.isEmpty else { return }
+
+        let client = plexClient
+        plexPrefetchTask?.cancel()
+        plexPrefetchTask = Task(priority: .utility) {
+            for item in itemsToPrefetch {
+                guard !Task.isCancelled else { return }
+                do {
+                    if item.isEpisode, let showRatingKey = item.showRatingKey {
+                        let showMetadata = try await client.fetchMetadata(
+                            ratingKey: showRatingKey,
+                            token: token,
+                            preferredServerID: preferredServerID
+                        )
+                        let guids = Self.extractGuids(from: showMetadata)
+                        if let tmdbID = Self.parseExternalIDs(from: guids).tmdbID {
+                            plexShowIDCache[showRatingKey] = tmdbID
+                        }
+                        continue
+                    }
+
+                    guard let typeHint = item.type?.lowercased(),
+                          typeHint == "movie" || typeHint == "show" else { continue }
+                    let metadata = try await client.fetchMetadata(
+                        ratingKey: item.ratingKey,
+                        token: token,
+                        preferredServerID: preferredServerID
+                    )
+                    let guids = Self.extractGuids(from: metadata)
+                    if let tmdbID = Self.parseExternalIDs(from: guids).tmdbID {
+                        let route: PlexNavigationRoute = typeHint == "movie"
+                        ? .movie(id: tmdbID, title: item.title, posterPath: nil)
+                        : .tv(id: tmdbID, title: item.seriesTitle ?? item.title, posterPath: nil)
+                        plexRouteCache[item.ratingKey] = route
+                    }
+                } catch {
+                    continue
+                }
+            }
+        }
     }
 
     private func parseYear(from dateString: String?) -> Int? {

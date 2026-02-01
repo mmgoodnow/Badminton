@@ -28,6 +28,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let title: String?
     let grandparentTitle: String?
     let parentTitle: String?
+    let grandparentKey: String?
     let index: Int?
     let parentIndex: Int?
     let year: Int?
@@ -46,6 +47,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case title
         case grandparentTitle
         case parentTitle
+        case grandparentKey
         case index
         case parentIndex
         case year
@@ -70,6 +72,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         title = try? container.decode(String.self, forKey: .title)
         grandparentTitle = try? container.decode(String.self, forKey: .grandparentTitle)
         parentTitle = try? container.decode(String.self, forKey: .parentTitle)
+        grandparentKey = try? container.decode(String.self, forKey: .grandparentKey)
         index = try? container.decode(Int.self, forKey: .index)
         parentIndex = try? container.decode(Int.self, forKey: .parentIndex)
         year = try? container.decode(Int.self, forKey: .year)
