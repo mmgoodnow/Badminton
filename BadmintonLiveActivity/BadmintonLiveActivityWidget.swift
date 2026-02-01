@@ -76,12 +76,13 @@ private struct ArtworkView: View {
                     .resizable()
                     .scaledToFill()
             case .failure(let error):
-                if !didLogFailure {
-                    didLogFailure = true
-                    print("Live Activity artwork load failed: \(error.localizedDescription)")
-                }
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(.quaternary)
+                    .onAppear {
+                        guard !didLogFailure else { return }
+                        didLogFailure = true
+                        print("Live Activity artwork load failed: \(error.localizedDescription)")
+                    }
             default:
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(.quaternary)
