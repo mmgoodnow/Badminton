@@ -790,13 +790,14 @@ final class HomeViewModel: ObservableObject {
                     return nil
                 }
                 nowPlayingSourceIDs.insert(item.id)
-                let subtitle = item.displaySubtitle.isEmpty ? "Now Playing" : "Now Playing • \(item.displaySubtitle)"
+                let display = plexDisplayInfo(for: item)
+                let subtitle = display.subtitle.isEmpty ? "Now Playing" : "Now Playing • \(display.subtitle)"
                 let showRatingKey = parseRatingKey(from: item.grandparentKey)
                 return PlexRecentlyWatchedItem(
                     id: "now-\(item.id)",
                     ratingKey: item.id,
                     type: item.type,
-                    title: item.displayTitle,
+                    title: display.title,
                     subtitle: subtitle,
                     imageURL: imageURL,
                     seriesTitle: item.grandparentTitle,
@@ -812,13 +813,14 @@ final class HomeViewModel: ObservableObject {
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
                     return nil
                 }
+                let display = plexDisplayInfo(for: item)
                 let showRatingKey = parseRatingKey(from: item.grandparentKey)
                 return PlexRecentlyWatchedItem(
                     id: item.id,
                     ratingKey: item.id,
                     type: item.type,
-                    title: item.displayTitle,
-                    subtitle: item.displaySubtitle,
+                    title: display.title,
+                    subtitle: display.subtitle,
                     imageURL: imageURL,
                     seriesTitle: item.grandparentTitle,
                     seasonNumber: item.parentIndex,
@@ -1146,6 +1148,20 @@ final class HomeViewModel: ObservableObject {
         let trimmed = key.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let parts = trimmed.split(separator: "/")
         return parts.last.map(String.init)
+    }
+
+    private func plexDisplayInfo(for item: PlexHistoryItem) -> (title: String, subtitle: String) {
+        if item.type?.lowercased() == "episode" {
+            let showTitle = item.grandparentTitle ?? item.parentTitle ?? item.title ?? "Untitled"
+            var titleParts = [showTitle]
+            if let season = item.parentIndex, let episode = item.index {
+                titleParts.append("S\(season)E\(episode)")
+            }
+            let title = titleParts.joined(separator: " • ")
+            let subtitle = item.title ?? ""
+            return (title: title, subtitle: subtitle)
+        }
+        return (title: item.displayTitle, subtitle: item.displaySubtitle)
     }
 
     private func startPlexPrefetch(token: String, preferredServerID: String?) {
