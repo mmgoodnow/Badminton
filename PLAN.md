@@ -20,14 +20,13 @@
 - [x] Plex→TMDB episode resolution using show TMDB ID + season/episode numbers (Tautulli-style).
 - [x] CLI/debug harness for Plex history inspection (`scripts/plex_history.swift`).
 - [x] Docs checked in: TMDB v3/v4 and Plex OpenAPI references.
+- [x] Plex “Now Playing” refreshes on app activation plus manual refresh (pull-to-refresh / Command-R).
 
 ## Next
-- [ ] Validate iOS build and tune layout for compact size classes.
-- [ ] Make Plex “Now Playing” more reliable (sessions polling + optional websocket updates).
-- [ ] Revisit typography sizing for small text in detail views and rail subtitles.
-- [ ] Add a TMDB-focused CLI/debug harness for response inspection (if still needed).
+- [ ] Accessibility pass (plan + audit before UI changes).
+- [ ] Live Activity integration for Plex playback (likely needs a server component).
 
 ## Later / Ideas
-- [ ] Live Activity integration for Plex playback.
-- [ ] Home page personalization using Plex history and “now playing” context.
-- [ ] Accessibility pass (dynamic type, VoiceOver labels, larger touch targets).
+- [ ] Validate iOS build and tune layout for compact size classes (deferred).
+- [ ] Revisit typography sizing for small text in detail views and rail subtitles (deferred).
+- [ ] Add a TMDB-focused CLI/debug harness for response inspection (deferred).

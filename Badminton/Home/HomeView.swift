@@ -6,10 +6,12 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @StateObject private var searchModel = SearchViewModel()
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showingSettings = false
     @State private var navigationPath = NavigationPath()
     @State private var plexResolvingItem: PlexRecentlyWatchedItem?
     @State private var plexFailureContext: PlexResolveFailureContext?
+    @State private var lastPlexVisibilityRefresh = Date.distantPast
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -131,10 +133,23 @@ struct HomeView: View {
                 )
             }
             .refreshable {
-                await viewModel.load(force: true)
+                await refreshAll(force: true)
             }
             .focusedSceneValue(\.badmintonRefreshAction) {
-                await viewModel.load(force: true)
+                await refreshAll(force: true)
+            }
+            .onChange(of: scenePhase) { newPhase in
+                guard newPhase == .active else { return }
+                let now = Date()
+                guard now.timeIntervalSince(lastPlexVisibilityRefresh) > 1 else { return }
+                lastPlexVisibilityRefresh = now
+                Task {
+                    await viewModel.refreshPlexNowPlaying(
+                        token: plexAuthManager.authToken,
+                        preferredServerID: plexAuthManager.preferredServerID,
+                        preferredAccountIDs: plexAuthManager.preferredAccountIDs
+                    )
+                }
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -154,6 +169,17 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    @MainActor
+    private func refreshAll(force: Bool) async {
+        await viewModel.load(force: force)
+        await viewModel.loadPlexHistory(
+            token: plexAuthManager.authToken,
+            preferredServerID: plexAuthManager.preferredServerID,
+            preferredAccountIDs: plexAuthManager.preferredAccountIDs,
+            force: force
+        )
     }
 
     private var searchResultsSection: some View {
@@ -724,19 +750,28 @@ final class HomeViewModel: ObservableObject {
         isLoading = false
     }
 
-    func loadPlexHistory(token: String?, preferredServerID: String?, preferredAccountIDs: Set<Int>) async {
+    func loadPlexHistory(
+        token: String?,
+        preferredServerID: String?,
+        preferredAccountIDs: Set<Int>,
+        force: Bool = false
+    ) async {
         guard let token, !token.isEmpty else {
             plexNowPlaying = []
             plexRecent = []
             plexTokenLoaded = nil
+            plexPreferredServerLoaded = nil
+            plexPreferredAccountLoaded = []
             return
         }
 
-        guard plexTokenLoaded != token
-            || plexPreferredServerLoaded != preferredServerID
-            || plexPreferredAccountLoaded != preferredAccountIDs
-            || (plexNowPlaying.isEmpty && plexRecent.isEmpty)
-        else { return }
+        if !force {
+            guard plexTokenLoaded != token
+                || plexPreferredServerLoaded != preferredServerID
+                || plexPreferredAccountLoaded != preferredAccountIDs
+                || (plexNowPlaying.isEmpty && plexRecent.isEmpty)
+            else { return }
+        }
 
         plexIsLoading = true
         do {
@@ -749,28 +784,10 @@ final class HomeViewModel: ObservableObject {
                 token: token,
                 preferredServerID: preferredServerID
             )
-            var preferredUsernames: Set<String> = []
-            if !preferredAccountIDs.isEmpty {
-                if let users = try? await plexClient.fetchHomeUsers(token: token) {
-                    preferredUsernames = Set(users
-                        .filter { preferredAccountIDs.contains($0.id) }
-                        .compactMap { $0.username ?? $0.title ?? $0.friendlyName }
-                        .map { $0.lowercased() }
-                    )
-                }
-            }
-            let matchesPreferredAccount: (PlexHistoryItem) -> Bool = { item in
-                guard !preferredAccountIDs.isEmpty else { return true }
-                if let accountID = item.accountID ?? item.userID,
-                   preferredAccountIDs.contains(accountID) {
-                    return true
-                }
-                if let userTitle = item.userTitle?.lowercased(),
-                   preferredUsernames.contains(userTitle) {
-                    return true
-                }
-                return false
-            }
+            let matchesPreferredAccount = await preferredAccountMatcher(
+                token: token,
+                preferredAccountIDs: preferredAccountIDs
+            )
             let filteredItems = result.items.filter { item in
                 matchesPreferredAccount(item)
             }
@@ -783,30 +800,13 @@ final class HomeViewModel: ObservableObject {
             var seenNowPlaying = Set<String>()
             let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
 
-            var nowPlayingSourceIDs: Set<String> = []
-            let nowPlayingMapped: [PlexRecentlyWatchedItem] = uniqueNowPlayingItems.compactMap { item in
-                guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
-                    return nil
-                }
-                nowPlayingSourceIDs.insert(item.id)
-                let display = plexDisplayInfo(for: item)
-                let subtitle = display.subtitle.isEmpty ? "Now Playing" : "Now Playing • \(display.subtitle)"
-                let showRatingKey = parseRatingKey(from: item.grandparentKey)
-                return PlexRecentlyWatchedItem(
-                    id: "now-\(item.id)",
-                    ratingKey: item.id,
-                    type: item.type,
-                    title: display.title,
-                    subtitle: subtitle,
-                    imageURL: imageURL,
-                    seriesTitle: item.grandparentTitle,
-                    seasonNumber: item.parentIndex,
-                    episodeNumber: item.index,
-                    year: item.year,
-                    originallyAvailableAt: item.originallyAvailableAt,
-                    showRatingKey: showRatingKey
-                )
-            }
+            let nowPlayingBaseURL = nowPlayingResult?.serverBaseURL ?? result.serverBaseURL
+            let nowPlayingToken = nowPlayingResult?.serverToken ?? result.serverToken
+            let nowPlayingPayload = mapNowPlayingItems(
+                items: uniqueNowPlayingItems,
+                serverBaseURL: nowPlayingBaseURL,
+                serverToken: nowPlayingToken
+            )
 
             let recentMapped: [PlexRecentlyWatchedItem] = limitedFilteredItems.compactMap { item in
                 guard let imageURL = item.imageURL(serverBaseURL: result.serverBaseURL, token: result.serverToken) else {
@@ -829,8 +829,8 @@ final class HomeViewModel: ObservableObject {
                     showRatingKey: showRatingKey
                 )
             }
-            plexNowPlaying = nowPlayingMapped
-            plexRecent = recentMapped.filter { !nowPlayingSourceIDs.contains($0.id) }
+            plexNowPlaying = nowPlayingPayload.items
+            plexRecent = recentMapped.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
@@ -841,6 +841,117 @@ final class HomeViewModel: ObservableObject {
             print("Plex history error: \(error)")
         }
         plexIsLoading = false
+    }
+
+    func refreshPlexNowPlaying(
+        token: String?,
+        preferredServerID: String?,
+        preferredAccountIDs: Set<Int>
+    ) async {
+        guard let token, !token.isEmpty else {
+            plexNowPlaying = []
+            return
+        }
+
+        if plexTokenLoaded != token
+            || plexPreferredServerLoaded != preferredServerID
+            || plexPreferredAccountLoaded != preferredAccountIDs
+            || plexRecent.isEmpty {
+            await loadPlexHistory(
+                token: token,
+                preferredServerID: preferredServerID,
+                preferredAccountIDs: preferredAccountIDs,
+                force: true
+            )
+            return
+        }
+
+        do {
+            let nowPlayingResult = try await plexClient.fetchNowPlaying(
+                token: token,
+                preferredServerID: preferredServerID
+            )
+            let matchesPreferredAccount = await preferredAccountMatcher(
+                token: token,
+                preferredAccountIDs: preferredAccountIDs
+            )
+            let nowPlayingItems = nowPlayingResult.items.filter { item in
+                matchesPreferredAccount(item)
+            }
+            var seenNowPlaying = Set<String>()
+            let uniqueNowPlayingItems = nowPlayingItems.filter { seenNowPlaying.insert($0.id).inserted }
+            let nowPlayingPayload = mapNowPlayingItems(
+                items: uniqueNowPlayingItems,
+                serverBaseURL: nowPlayingResult.serverBaseURL,
+                serverToken: nowPlayingResult.serverToken
+            )
+            plexNowPlaying = nowPlayingPayload.items
+            plexRecent = plexRecent.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
+        } catch {
+            print("Plex now playing error: \(error)")
+        }
+    }
+
+    private func preferredAccountMatcher(
+        token: String,
+        preferredAccountIDs: Set<Int>
+    ) async -> (PlexHistoryItem) -> Bool {
+        guard !preferredAccountIDs.isEmpty else {
+            return { _ in true }
+        }
+
+        var preferredUsernames: Set<String> = []
+        if let users = try? await plexClient.fetchHomeUsers(token: token) {
+            preferredUsernames = Set(users
+                .filter { preferredAccountIDs.contains($0.id) }
+                .compactMap { $0.username ?? $0.title ?? $0.friendlyName }
+                .map { $0.lowercased() }
+            )
+        }
+
+        return { item in
+            if let accountID = item.accountID ?? item.userID,
+               preferredAccountIDs.contains(accountID) {
+                return true
+            }
+            if let userTitle = item.userTitle?.lowercased(),
+               preferredUsernames.contains(userTitle) {
+                return true
+            }
+            return false
+        }
+    }
+
+    private func mapNowPlayingItems(
+        items: [PlexHistoryItem],
+        serverBaseURL: URL,
+        serverToken: String
+    ) -> (items: [PlexRecentlyWatchedItem], sourceIDs: Set<String>) {
+        var sourceIDs: Set<String> = []
+        let mapped = items.compactMap { item -> PlexRecentlyWatchedItem? in
+            guard let imageURL = item.imageURL(serverBaseURL: serverBaseURL, token: serverToken) else {
+                return nil
+            }
+            sourceIDs.insert(item.id)
+            let display = plexDisplayInfo(for: item)
+            let subtitle = display.subtitle.isEmpty ? "Now Playing" : "Now Playing • \(display.subtitle)"
+            let showRatingKey = parseRatingKey(from: item.grandparentKey)
+            return PlexRecentlyWatchedItem(
+                id: "now-\(item.id)",
+                ratingKey: item.id,
+                type: item.type,
+                title: display.title,
+                subtitle: subtitle,
+                imageURL: imageURL,
+                seriesTitle: item.grandparentTitle,
+                seasonNumber: item.parentIndex,
+                episodeNumber: item.index,
+                year: item.year,
+                originallyAvailableAt: item.originallyAvailableAt,
+                showRatingKey: showRatingKey
+            )
+        }
+        return (mapped, sourceIDs)
     }
 
     func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexResolveResult {
