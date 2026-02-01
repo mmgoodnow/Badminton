@@ -2,16 +2,66 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authManager: TMDBAuthManager
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @StateObject private var plexServers = PlexServerListViewModel()
     @StateObject private var plexAccounts = PlexAccountListViewModel()
 #if os(iOS)
     @StateObject private var liveActivity = PlaybackLiveActivityManager()
 #endif
+    @State private var isSigningInTMDB = false
+    @State private var tmdbErrorMessage: String?
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("TMDB") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Sign in with TMDB to personalize your experience.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        GroupBox("Configuration") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
+                                configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
+                                configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
+                                Text("Set these in Secrets.xcconfig or via Xcode Cloud env vars.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        if authManager.isAuthenticated {
+                            HStack {
+                                Label("Connected", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Spacer()
+                            }
+                            Button("Disconnect TMDB", role: .destructive) {
+                                Task { await authManager.signOut() }
+                            }
+                        } else {
+                            if isSigningInTMDB {
+                                ProgressView("Connecting…")
+                            }
+                            Button("Sign in with TMDB") {
+                                Task { await signInTMDB() }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!canSignInTMDB)
+                        }
+
+                        if let tmdbErrorMessage {
+                            Text(tmdbErrorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
                 Section("Plex") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Connect Plex to personalize Badminton and see what you're watching.")
@@ -191,9 +241,39 @@ struct SettingsView: View {
         }
         return account.displayName
     }
+
+    private func signInTMDB() async {
+        tmdbErrorMessage = nil
+        isSigningInTMDB = true
+        do {
+            try await authManager.signIn()
+        } catch {
+            tmdbErrorMessage = error.localizedDescription
+        }
+        isSigningInTMDB = false
+    }
+
+    private var canSignInTMDB: Bool {
+        !TMDBConfig.apiKey.isEmpty && !TMDBConfig.readAccessToken.isEmpty && !TMDBConfig.redirectURI.isEmpty
+    }
+
+    @ViewBuilder
+    private func configRow(title: String, isReady: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isReady ? .green : .orange)
+            Text(title)
+                .font(.subheadline)
+            Spacer()
+            Text(isReady ? "Set" : "Missing")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 }
 
 #Preview {
     SettingsView()
+        .environmentObject(TMDBAuthManager())
         .environmentObject(PlexAuthManager())
 }
