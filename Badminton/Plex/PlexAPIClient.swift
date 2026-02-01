@@ -158,8 +158,6 @@ final class PlexAPIClient {
         let candidates = connections ?? []
         let nonRelay = candidates.filter { !$0.isRelay && $0.uri != nil }
         let plexDirect = nonRelay.filter { $0.isPlexDirect }
-        let plexDirectIPv4 = plexDirect.filter { !$0.isIPv6Address }
-        let nonRelayIPv4 = nonRelay.filter { !$0.isIPv6Address }
 
         func pickBest(from list: [PlexConnection]) -> URL? {
             if let remoteSecure = list.first(where: { !$0.isLocal && $0.isSecure }) {
@@ -177,19 +175,17 @@ final class PlexAPIClient {
             return list.first?.uri
         }
 
-        if let plexPreferred = pickBest(from: plexDirectIPv4) {
-            return plexPreferred
+        let selected = pickBest(from: plexDirect)
+            ?? pickBest(from: nonRelay)
+            ?? candidates.first(where: { $0.uri != nil })?.uri
+#if DEBUG
+        if let selected, let connection = candidates.first(where: { $0.uri == selected }) {
+            print("Plex selected connection: \(selected) local=\(connection.isLocal) relay=\(connection.isRelay) plexDirect=\(connection.isPlexDirect) ipv6=\(connection.isIPv6Address)")
+        } else if let selected {
+            print("Plex selected connection: \(selected)")
         }
-        if let plexPreferred = pickBest(from: plexDirect) {
-            return plexPreferred
-        }
-        if let preferred = pickBest(from: nonRelayIPv4) {
-            return preferred
-        }
-        if let preferred = pickBest(from: nonRelay) {
-            return preferred
-        }
-        return candidates.first(where: { $0.uri != nil })?.uri
+#endif
+        return selected
     }
 
     private func requestHistoryData(token: String, size: Int, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {

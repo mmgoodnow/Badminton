@@ -92,6 +92,16 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .navigationDestination(for: TMDBNavigationRoute.self) { route in
+                switch route {
+                case .movie(let id, let title, let posterPath):
+                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
+                case .tv(let id, let title, let posterPath):
+                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
+                case .person(let id, let name, let profilePath):
+                    PersonDetailView(personID: id, name: name, profilePath: profilePath)
+                }
+            }
             .navigationDestination(for: PlexNavigationRoute.self) { route in
                 switch route {
                 case .movie(let id, let title, let posterPath):
@@ -291,12 +301,24 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(items, id: \.id) { item in
-                        NavigationLink {
+                        Button {
                             switch item {
                             case .tv:
-                                TVDetailView(tvID: item.id, title: item.displayTitle, posterPath: item.posterPath)
+                                navigationPath.append(
+                                    TMDBNavigationRoute.tv(
+                                        id: item.id,
+                                        title: item.displayTitle,
+                                        posterPath: item.posterPath
+                                    )
+                                )
                             case .movie:
-                                MovieDetailView(movieID: item.id, title: item.displayTitle, posterPath: item.posterPath)
+                                navigationPath.append(
+                                    TMDBNavigationRoute.movie(
+                                        id: item.id,
+                                        title: item.displayTitle,
+                                        posterPath: item.posterPath
+                                    )
+                                )
                             }
                         } label: {
                             PosterCardView(
@@ -323,15 +345,21 @@ struct HomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(items) { person in
-                            NavigationLink {
-                                PersonDetailView(personID: person.id, name: person.name, profilePath: person.profilePath)
-                            } label: {
-                                PersonCardView(
+                        Button {
+                            navigationPath.append(
+                                TMDBNavigationRoute.person(
+                                    id: person.id,
                                     name: person.name,
-                                    subtitle: person.knownForDepartment ?? "",
-                                    imageURL: viewModel.profileURL(path: person.profilePath)
+                                    profilePath: person.profilePath
                                 )
-                            }
+                            )
+                        } label: {
+                            PersonCardView(
+                                name: person.name,
+                                subtitle: person.knownForDepartment ?? "",
+                                imageURL: viewModel.profileURL(path: person.profilePath)
+                            )
+                        }
                             .buttonStyle(.plain)
                         }
                     }
@@ -414,6 +442,12 @@ private enum HomeMediaItem {
         }
     }
 
+}
+
+private enum TMDBNavigationRoute: Hashable {
+    case movie(id: Int, title: String?, posterPath: String?)
+    case tv(id: Int, title: String?, posterPath: String?)
+    case person(id: Int, name: String?, profilePath: String?)
 }
 
 struct PlexRecentlyWatchedItem: Identifiable, Hashable {
