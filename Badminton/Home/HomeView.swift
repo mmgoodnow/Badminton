@@ -186,42 +186,68 @@ struct HomeView: View {
         if searchModel.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            plexAuthManager.isAuthenticated {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Recently Watched on Plex")
-                    .font(.title2.bold())
-
                 let nowPlaying = viewModel.plexNowPlaying
                 let recent = viewModel.plexRecent
                 let hasItems = !nowPlaying.isEmpty || !recent.isEmpty
 
                 if viewModel.plexIsLoading && !hasItems {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 20) {
-                            plexSkeletonRow(title: "Now Playing")
-                            plexSkeletonRow(title: "Recent")
-                        }
-                        .padding(.vertical, 4)
+                    HStack(alignment: .top, spacing: 24) {
+                        plexColumnSkeleton(title: "Now Playing")
+                        plexColumnSkeleton(title: "Recent")
                     }
                 } else if !nowPlaying.isEmpty && !recent.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 20) {
-                            plexRailRow(title: "Now Playing", items: nowPlaying)
-                            plexRailRow(title: "Recent", items: recent)
-                        }
-                        .padding(.vertical, 4)
+                    HStack(alignment: .top, spacing: 24) {
+                        plexRailColumn(title: "Now Playing", items: nowPlaying)
+                        plexRailColumn(title: "Recent", items: recent)
                     }
                 } else if !nowPlaying.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        plexRailRow(title: "Now Playing", items: nowPlaying)
-                            .padding(.vertical, 4)
-                    }
+                    plexRailColumn(title: "Now Playing", items: nowPlaying)
                 } else if !recent.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        plexRailRow(title: "Recent", items: recent)
-                            .padding(.vertical, 4)
+                    plexRailColumn(title: "Recent", items: recent)
+                }
+            }
+        }
+    }
+
+    private func plexRailColumn(title: String, items: [PlexRecentlyWatchedItem]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(items) { item in
+                        Button {
+                            handlePlexSelection(item)
+                        } label: {
+                            PosterCardView(
+                                title: item.title,
+                                subtitle: item.subtitle,
+                                imageURL: item.imageURL
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func plexColumnSkeleton(title: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .redacted(reason: .placeholder)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(0..<6, id: \.self) { _ in
+                        PlexPosterSkeleton()
                     }
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -278,40 +304,6 @@ struct HomeView: View {
                         }
                     }
                     .padding(.vertical, 4)
-                }
-            }
-        }
-    }
-
-    private func plexRailRow(title: String, items: [PlexRecentlyWatchedItem]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(items) { item in
-                    Button {
-                        handlePlexSelection(item)
-                    } label: {
-                        PosterCardView(
-                            title: item.title,
-                            subtitle: item.subtitle,
-                            imageURL: item.imageURL
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private func plexSkeletonRow(title: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .redacted(reason: .placeholder)
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(0..<6, id: \.self) { _ in
-                    PlexPosterSkeleton()
                 }
             }
         }
