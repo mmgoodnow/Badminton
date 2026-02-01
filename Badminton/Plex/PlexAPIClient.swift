@@ -158,6 +158,8 @@ final class PlexAPIClient {
         let candidates = connections ?? []
         let nonRelay = candidates.filter { !$0.isRelay && $0.uri != nil }
         let plexDirect = nonRelay.filter { $0.isPlexDirect }
+        let plexDirectIPv4 = plexDirect.filter { !$0.isIPv6Address }
+        let nonRelayIPv4 = nonRelay.filter { !$0.isIPv6Address }
 
         func pickBest(from list: [PlexConnection]) -> URL? {
             if let remoteSecure = list.first(where: { !$0.isLocal && $0.isSecure }) {
@@ -175,8 +177,14 @@ final class PlexAPIClient {
             return list.first?.uri
         }
 
+        if let plexPreferred = pickBest(from: plexDirectIPv4) {
+            return plexPreferred
+        }
         if let plexPreferred = pickBest(from: plexDirect) {
             return plexPreferred
+        }
+        if let preferred = pickBest(from: nonRelayIPv4) {
+            return preferred
         }
         if let preferred = pickBest(from: nonRelay) {
             return preferred
@@ -351,14 +359,18 @@ private struct PlexDevice: Decodable {
 
 private struct PlexConnection: Decodable {
     let uri: URL?
+    let address: String?
     let isLocal: Bool
     let isRelay: Bool
+    let isIPv6: Bool?
     let `protocol`: String?
 
     private enum CodingKeys: String, CodingKey {
         case uri
+        case address
         case isLocal = "local"
         case isRelay = "relay"
+        case isIPv6 = "IPv6"
         case `protocol` = "protocol"
     }
 
@@ -368,6 +380,16 @@ private struct PlexConnection: Decodable {
 
     var isPlexDirect: Bool {
         uri?.host?.hasSuffix(".plex.direct") == true
+    }
+
+    var isIPv6Address: Bool {
+        if let isIPv6 {
+            return isIPv6
+        }
+        if let address {
+            return address.contains(":")
+        }
+        return false
     }
 }
 
