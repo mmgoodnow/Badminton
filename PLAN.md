@@ -17,14 +17,15 @@
 - [x] Plex account filtering with multi-select of home users.
 - [x] Plex rails on home: Now Playing + Recent in side-by-side columns within a shared horizontal scroll.
 - [x] Plex rail improvements: dedupe, limit episodes per show, show title formatting, prefetch TMDB mappings, and resolution error handling.
+- [x] Plex→TMDB episode resolution using show TMDB ID + season/episode numbers (Tautulli-style).
+- [x] CLI/debug harness for Plex history inspection (`scripts/plex_history.swift`).
 - [x] Docs checked in: TMDB v3/v4 and Plex OpenAPI references.
 
 ## Next
 - [ ] Validate iOS build and tune layout for compact size classes.
 - [ ] Make Plex “Now Playing” more reliable (sessions polling + optional websocket updates).
-- [ ] Improve Plex→TMDB episode resolution using show TMDB ID + season/episode numbers (Tautulli-style).
 - [ ] Revisit typography sizing for small text in detail views and rail subtitles.
-- [ ] Add an explicit CLI/debug harness for Plex/TMDB response inspection (if still needed).
+- [ ] Add a TMDB-focused CLI/debug harness for response inspection (if still needed).
 
 ## Later / Ideas
 - [ ] Live Activity integration for Plex playback.
