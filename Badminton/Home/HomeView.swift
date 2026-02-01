@@ -691,8 +691,7 @@ final class HomeViewModel: ObservableObject {
     private var plexShowIDCache: [String: Int] = [:]
     private var plexPrefetchedKeys: Set<String> = []
     private var plexPrefetchTask: Task<Void, Never>?
-    private var plexAccountNameCache: [Int: PlexUserAccount] = [:]
-    private var plexCurrentUserCache: PlexUserAccount?
+    private let plexAccountResolver = PlexAccountResolver.shared
 
     init(client: TMDBAPIClient = TMDBAPIClient(), plexClient: PlexAPIClient = PlexAPIClient()) {
         self.client = client
@@ -777,7 +776,6 @@ final class HomeViewModel: ObservableObject {
 
         plexIsLoading = true
         do {
-            resetPlexAccountCachesIfNeeded(token: token)
             let result = try await plexClient.fetchRecentlyWatched(
                 token: token,
                 size: 500,
@@ -874,7 +872,6 @@ final class HomeViewModel: ObservableObject {
         }
 
         do {
-            resetPlexAccountCachesIfNeeded(token: token)
             let nowPlayingResult = try await plexClient.fetchNowPlaying(
                 token: token,
                 preferredServerID: preferredServerID
@@ -911,146 +908,23 @@ final class HomeViewModel: ObservableObject {
             return { _ in true }
         }
 
-        var preferredUsernames: Set<String> = []
-        if let users = try? await plexClient.fetchHomeUsers(token: token) {
-            for user in users where preferredAccountIDs.contains(user.id) {
-                preferredUsernames.formUnion(normalizedNames(for: user))
-            }
-        }
-
-        let matchingAccountIDs = await resolveAccountIDs(
-            matchingNames: preferredUsernames,
+        let homeUsers = (try? await plexClient.fetchHomeUsers(token: token)) ?? []
+        let criteria = await plexAccountResolver.matchCriteria(
+            preferredHomeUserIDs: preferredAccountIDs,
+            homeUsers: homeUsers,
             candidateAccountIDs: candidateAccountIDs,
-            preferredAccountIDs: preferredAccountIDs,
             token: token
         )
 
         return { item in
             if let accountID = item.accountID ?? item.userID,
-               matchingAccountIDs.contains(accountID) {
+               criteria.matchingAccountIDs.contains(accountID) {
                 return true
             }
-            if let userTitle = item.userTitle,
-               preferredUsernames.contains(self.normalizeName(userTitle)) {
+            if criteria.matches(userTitle: item.userTitle) {
                 return true
             }
             return false
-        }
-    }
-
-    private func resolveAccountIDs(
-        matchingNames: Set<String>,
-        candidateAccountIDs: Set<Int>,
-        preferredAccountIDs: Set<Int>,
-        token: String
-    ) async -> Set<Int> {
-        guard !matchingNames.isEmpty else {
-            return preferredAccountIDs
-        }
-
-        let resolvedNameVariants = await resolveAccountNameVariants(
-            accountIDs: Array(candidateAccountIDs),
-            token: token
-        )
-        var matchingAccountIDs = preferredAccountIDs
-        for (accountID, names) in resolvedNameVariants {
-            if !names.isDisjoint(with: matchingNames) {
-                matchingAccountIDs.insert(accountID)
-            }
-        }
-        return matchingAccountIDs
-    }
-
-    private func resolveAccountNameVariants(
-        accountIDs: [Int],
-        token: String
-    ) async -> [Int: Set<String>] {
-        guard !accountIDs.isEmpty else { return [:] }
-
-        var resolved: [Int: PlexUserAccount] = [:]
-        var pending: [Int] = []
-
-        for accountID in accountIDs {
-            if let cached = plexAccountNameCache[accountID] {
-                resolved[accountID] = cached
-            } else {
-                pending.append(accountID)
-            }
-        }
-
-        if pending.contains(1) {
-            if let cachedCurrent = plexCurrentUserCache {
-                let mapped = PlexUserAccount(id: 1, title: cachedCurrent.title, username: cachedCurrent.username)
-                resolved[1] = mapped
-                plexAccountNameCache[1] = mapped
-                pending.removeAll { $0 == 1 }
-            } else if let currentUser = try? await plexClient.fetchCurrentUser(token: token) {
-                plexCurrentUserCache = currentUser
-                let mapped = PlexUserAccount(id: 1, title: currentUser.title, username: currentUser.username)
-                resolved[1] = mapped
-                plexAccountNameCache[1] = mapped
-                pending.removeAll { $0 == 1 }
-            }
-        }
-
-        if !pending.isEmpty {
-            await withTaskGroup(of: (Int, PlexUserAccount?).self) { group in
-                for accountID in pending {
-                    group.addTask { [plexClient] in
-                        let account = try? await plexClient.fetchUserAccount(id: accountID, token: token)
-                        return (accountID, account)
-                    }
-                }
-                for await (accountID, account) in group {
-                    if let account {
-                        resolved[accountID] = account
-                        plexAccountNameCache[accountID] = account
-                    }
-                }
-            }
-        }
-
-        let unresolved = Set(accountIDs).subtracting(resolved.keys)
-        if !unresolved.isEmpty {
-            print("Plex account filter missing names for accountIDs: \(unresolved.sorted())")
-        }
-
-        var variants: [Int: Set<String>] = [:]
-        for (accountID, account) in resolved {
-            let names = normalizedNames(for: account)
-            if !names.isEmpty {
-                variants[accountID] = names
-            }
-        }
-        return variants
-    }
-
-    private func normalizedNames(for user: PlexHomeUser) -> Set<String> {
-        var names: Set<String> = []
-        if let friendlyName = user.friendlyName, !friendlyName.isEmpty {
-            names.insert(normalizeName(friendlyName))
-        }
-        if let title = user.title, !title.isEmpty {
-            names.insert(normalizeName(title))
-        }
-        if let username = user.username, !username.isEmpty {
-            names.insert(normalizeName(username))
-        }
-        return names
-    }
-
-    private func normalizedNames(for account: PlexUserAccount) -> Set<String> {
-        Set(account.nameVariants.map(normalizeName))
-    }
-
-    private func normalizeName(_ name: String) -> String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
-    private func resetPlexAccountCachesIfNeeded(token: String) {
-        if plexTokenLoaded != token {
-            plexAccountNameCache = [:]
-            plexCurrentUserCache = nil
         }
     }
 
