@@ -218,7 +218,7 @@ struct HomeView: View {
     private func plexRailColumn(title: String, items: [PlexRecentlyWatchedItem]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.headline)
+                .font(.title2.bold())
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(items) { item in
@@ -243,7 +243,7 @@ struct HomeView: View {
     private func plexColumnSkeleton(title: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.headline)
+                .font(.title2.bold())
                 .redacted(reason: .placeholder)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
