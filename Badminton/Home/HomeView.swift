@@ -7,9 +7,12 @@ struct HomeView: View {
     @StateObject private var searchModel = SearchViewModel()
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @State private var showingSettings = false
+    @State private var navigationPath = NavigationPath()
+    @State private var plexResolvingItem: PlexRecentlyWatchedItem?
+    @State private var plexFailureContext: PlexResolveFailureContext?
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     plexRecentlyWatchedSection
@@ -87,6 +90,22 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .navigationDestination(for: PlexNavigationRoute.self) { route in
+                switch route {
+                case .movie(let id, let title, let posterPath):
+                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
+                case .tv(let id, let title, let posterPath):
+                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
+                case .episode(let tvID, let seasonNumber, let episodeNumber, let title, _):
+                    EpisodeDetailView(
+                        tvID: tvID,
+                        seasonNumber: seasonNumber,
+                        episodeNumber: episodeNumber,
+                        title: title,
+                        stillPath: nil
+                    )
+                }
+            }
             .task {
                 await viewModel.load()
             }
@@ -119,6 +138,20 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
+            }
+            .sheet(item: $plexFailureContext) { context in
+                PlexResolveFailureSheet(
+                    item: context.item,
+                    failure: context.failure
+                ) {
+                    let fallbackQuery = context.item.seriesTitle ?? context.item.title
+                    searchModel.query = fallbackQuery
+                }
+            }
+            .overlay {
+                if let plexResolvingItem {
+                    PlexResolveOverlay(item: plexResolvingItem)
+                }
             }
         }
     }
@@ -157,20 +190,20 @@ struct HomeView: View {
                     .font(.title2.bold())
 
                 if viewModel.plexIsLoading && viewModel.plexRecentlyWatched.isEmpty {
-                    ProgressView("Loading Plex history…")
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 16) {
+                            ForEach(0..<6, id: \.self) { _ in
+                                PlexPosterSkeleton()
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 } else if !viewModel.plexRecentlyWatched.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 16) {
                             ForEach(viewModel.plexRecentlyWatched) { item in
-                                NavigationLink {
-                                    PlexResolveView(
-                                        item: item,
-                                        viewModel: viewModel,
-                                        searchModel: searchModel,
-                                        token: plexAuthManager.authToken,
-                                        preferredServerID: plexAuthManager.preferredServerID
-                                    )
+                                Button {
+                                    handlePlexSelection(item)
                                 } label: {
                                     PosterCardView(
                                         title: item.title,
@@ -246,6 +279,38 @@ struct HomeView: View {
             }
         }
     }
+
+    private func handlePlexSelection(_ item: PlexRecentlyWatchedItem) {
+        guard plexResolvingItem == nil else { return }
+        guard let token = plexAuthManager.authToken, !token.isEmpty else {
+            plexFailureContext = PlexResolveFailureContext(
+                item: item,
+                failure: PlexResolveFailure(
+                    step: .missingToken,
+                    reason: "Missing or expired Plex auth token.",
+                    notes: []
+                )
+            )
+            return
+        }
+        plexResolvingItem = item
+        Task {
+            let result = await viewModel.resolvePlexRoute(
+                for: item,
+                token: token,
+                preferredServerID: plexAuthManager.preferredServerID
+            )
+            await MainActor.run {
+                plexResolvingItem = nil
+                switch result {
+                case .success(let route):
+                    navigationPath.append(route)
+                case .failure(let failure):
+                    plexFailureContext = PlexResolveFailureContext(item: item, failure: failure)
+                }
+            }
+        }
+    }
 }
 
 private enum HomeMediaItem {
@@ -310,134 +375,6 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     }
 }
 
-private struct PlexResolveView: View {
-    let item: PlexRecentlyWatchedItem
-    @ObservedObject var viewModel: HomeViewModel
-    @ObservedObject var searchModel: SearchViewModel
-    let token: String?
-    let preferredServerID: String?
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var resolvedRoute: PlexNavigationRoute?
-    @State private var didFail = false
-    @State private var failureDetail: PlexResolveFailure?
-
-    var body: some View {
-        Group {
-            if let resolvedRoute {
-                switch resolvedRoute {
-                case .movie(let id, let title, let posterPath):
-                    MovieDetailView(movieID: id, title: title, posterPath: posterPath)
-                case .tv(let id, let title, let posterPath):
-                    TVDetailView(tvID: id, title: title, posterPath: posterPath)
-                case .episode(let tvID, let seasonNumber, let episodeNumber, let title, _):
-                    EpisodeDetailView(
-                        tvID: tvID,
-                        seasonNumber: seasonNumber,
-                        episodeNumber: episodeNumber,
-                        title: title,
-                        stillPath: nil
-                    )
-                }
-            } else if didFail {
-                VStack(spacing: 12) {
-                    Text("Couldn’t resolve this Plex item.")
-                        .font(.headline)
-                    VStack(spacing: 4) {
-                        Text(item.title)
-                            .font(.subheadline.weight(.semibold))
-                        if !item.subtitle.isEmpty {
-                            Text(item.subtitle)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(unresolvedDetailLine)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .multilineTextAlignment(.center)
-                    if let failureDetail {
-                        VStack(spacing: 4) {
-                            Text("Failed at: \(failureDetail.step.label)")
-                                .font(.footnote.weight(.semibold))
-                            if let reason = failureDetail.reason {
-                                Text(reason)
-                                    .font(.footnote)
-                            }
-                            ForEach(failureDetail.notes, id: \.self) { note in
-                                Text(note)
-                                    .font(.footnote)
-                            }
-                        }
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    } else {
-                        Text("Try searching TMDB or check the Plex metadata.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    Button("Search TMDB") {
-                        let fallbackQuery = item.seriesTitle ?? item.title
-                        searchModel.query = fallbackQuery
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            } else {
-                ProgressView("Resolving Plex item…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            }
-        }
-        .macOSSwipeToDismiss { dismiss() }
-        .task {
-            await resolve()
-        }
-    }
-
-    private func resolve() async {
-        guard resolvedRoute == nil, !didFail else { return }
-        guard let token, !token.isEmpty else {
-            failureDetail = PlexResolveFailure(
-                step: .missingToken,
-                reason: "Missing or expired Plex auth token.",
-                notes: []
-            )
-            didFail = true
-            return
-        }
-        let result = await viewModel.resolvePlexRoute(
-            for: item,
-            token: token,
-            preferredServerID: preferredServerID
-        )
-        switch result {
-        case .success(let route):
-            resolvedRoute = route
-        case .failure(let failure):
-            failureDetail = failure
-            didFail = true
-        }
-    }
-
-    private var unresolvedDetailLine: String {
-        var parts: [String] = []
-        if let seriesTitle = item.seriesTitle {
-            parts.append(seriesTitle)
-        }
-        if let season = item.seasonNumber, let episode = item.episodeNumber {
-            parts.append("S\(season)E\(episode)")
-        }
-        if let year = item.year {
-            parts.append(String(year))
-        }
-        if parts.isEmpty {
-            return "No additional metadata available."
-        }
-        return parts.joined(separator: " • ")
-    }
-}
-
 enum PlexNavigationRoute: Hashable {
     case movie(id: Int, title: String?, posterPath: String?)
     case tv(id: Int, title: String?, posterPath: String?)
@@ -470,6 +407,12 @@ struct PlexResolveFailure: Hashable {
     let notes: [String]
 }
 
+struct PlexResolveFailureContext: Identifiable {
+    let id = UUID()
+    let item: PlexRecentlyWatchedItem
+    let failure: PlexResolveFailure
+}
+
 enum PlexResolveResult: Hashable {
     case success(PlexNavigationRoute)
     case failure(PlexResolveFailure)
@@ -477,6 +420,119 @@ enum PlexResolveResult: Hashable {
 
 private struct PlexExternalIDs {
     var tmdbID: Int?
+}
+
+private struct PlexResolveFailureSheet: View {
+    let item: PlexRecentlyWatchedItem
+    let failure: PlexResolveFailure
+    let onSearch: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Couldn’t resolve this Plex item.")
+                .font(.headline)
+
+            VStack(spacing: 4) {
+                Text(item.title)
+                    .font(.subheadline.weight(.semibold))
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Text(unresolvedDetailLine)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+
+            VStack(spacing: 4) {
+                Text("Failed at: \(failure.step.label)")
+                    .font(.footnote.weight(.semibold))
+                if let reason = failure.reason {
+                    Text(reason)
+                        .font(.footnote)
+                }
+                ForEach(failure.notes, id: \.self) { note in
+                    Text(note)
+                        .font(.footnote)
+                }
+            }
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+
+            HStack(spacing: 12) {
+                Button("Close") {
+                    dismiss()
+                }
+                Button("Search TMDB") {
+                    onSearch()
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 320)
+    }
+
+    private var unresolvedDetailLine: String {
+        var parts: [String] = []
+        if let seriesTitle = item.seriesTitle {
+            parts.append(seriesTitle)
+        }
+        if let season = item.seasonNumber, let episode = item.episodeNumber {
+            parts.append("S\(season)E\(episode)")
+        }
+        if let year = item.year {
+            parts.append(String(year))
+        }
+        if parts.isEmpty {
+            return "No additional metadata available."
+        }
+        return parts.joined(separator: " • ")
+    }
+}
+
+private struct PlexResolveOverlay: View {
+    let item: PlexRecentlyWatchedItem
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.2)
+                .ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView()
+                Text("Resolving \(item.title)…")
+                    .font(.headline)
+            }
+            .padding(20)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
+        .transition(.opacity)
+    }
+}
+
+private struct PlexPosterSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 140, height: 210)
+
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 120, height: 14)
+
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.gray.opacity(0.2))
+                .frame(width: 90, height: 12)
+        }
+        .redacted(reason: .placeholder)
+        .frame(width: 140, alignment: .leading)
+    }
 }
 
 private struct PosterCardView: View {
