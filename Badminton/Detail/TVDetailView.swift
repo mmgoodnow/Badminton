@@ -631,7 +631,8 @@ private struct FlowLayout: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
+        let proposedWidth = proposal.width
+        let maxWidth = (proposedWidth?.isFinite == true) ? proposedWidth! : .greatestFiniteMagnitude
         let rows = makeRows(subviews: subviews, maxWidth: maxWidth)
         let rowHeights = rows.map { row in
             row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
@@ -644,12 +645,18 @@ private struct FlowLayout: Layout {
             }
         }
         let totalHeight = rowHeights.reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
-        let width = (proposal.width ?? rowWidths.max()) ?? 0
+        let width: CGFloat
+        if let proposedWidth, proposedWidth.isFinite {
+            width = proposedWidth
+        } else {
+            width = rowWidths.max() ?? 0
+        }
         return CGSize(width: width, height: totalHeight)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = makeRows(subviews: subviews, maxWidth: bounds.width)
+        let maxWidth = bounds.width.isFinite ? bounds.width : .greatestFiniteMagnitude
+        let rows = makeRows(subviews: subviews, maxWidth: maxWidth)
         let rowHeights = rows.map { row in
             row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
         }
