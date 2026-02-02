@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,115 +19,18 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("TMDB") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Sign in with TMDB to personalize your experience.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-
-                        GroupBox("Configuration") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
-                                configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
-                                configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
-                                Text("Set these in Secrets.xcconfig or via Xcode Cloud env vars.")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        if authManager.isAuthenticated {
-                            HStack {
-                                Label("Connected", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Spacer()
-                            }
-                            Button("Disconnect TMDB", role: .destructive) {
-                                Task { await authManager.signOut() }
-                            }
-                        } else {
-                            if isSigningInTMDB {
-                                ProgressView("Connecting…")
-                            }
-                            Button("Sign in with TMDB") {
-                                Task { await signInTMDB() }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(!canSignInTMDB)
-                        }
-
-                        if let tmdbErrorMessage {
-                            Text(tmdbErrorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                                .multilineTextAlignment(.leading)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                Section("Plex") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Connect Plex to personalize Badminton and see what you're watching.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-
-                        if plexAuthManager.isAuthenticated {
-                            HStack {
-                                Label("Connected", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Spacer()
-                            }
-                            serverPicker
-                            accountPicker
-                            Button("Disconnect Plex", role: .destructive) {
-                                plexAuthManager.signOut()
-                            }
-                        } else {
-                            Button(plexAuthManager.isAuthenticating ? "Connecting…" : "Connect Plex") {
-                                Task { await plexAuthManager.signIn() }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(plexAuthManager.isAuthenticating)
-                        }
-
-                        if plexAuthManager.isAuthenticating {
-                            ProgressView("Waiting for Plex…")
-                        }
-
-                        if let errorMessage = plexAuthManager.errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    tmdbCard
+                    plexCard
 #if os(iOS)
-                Section("Live Activity (Debug)") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(liveActivity.status)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 12) {
-                            Button("Start") {
-                                liveActivity.startSample()
-                            }
-                            Button("Update") {
-                                liveActivity.updateSample()
-                            }
-                            Button("End") {
-                                liveActivity.endSample()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding(.vertical, 4)
-                }
+                    liveActivityCard
 #endif
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .formStyle(.grouped)
+            .background(settingsBackground)
             .navigationTitle("Settings")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -148,6 +56,111 @@ struct SettingsView: View {
         .frame(minWidth: 360, minHeight: 320)
     }
 
+    private var tmdbCard: some View {
+        settingsCard(
+            title: "TMDB",
+            subtitle: "Sign in with TMDB to personalize your experience.",
+            status: tmdbStatus
+        ) {
+            settingsSubcard(title: "Configuration") {
+                VStack(alignment: .leading, spacing: 8) {
+                    configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
+                    configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
+                    configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
+                    Text("Set these in Secrets.xcconfig or via Xcode Cloud env vars.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if authManager.isAuthenticated {
+                Button("Disconnect TMDB", role: .destructive) {
+                    Task { await authManager.signOut() }
+                }
+                .buttonStyle(.bordered)
+            } else {
+                if isSigningInTMDB {
+                    ProgressView("Connecting…")
+                }
+                Button("Sign in with TMDB") {
+                    Task { await signInTMDB() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSignInTMDB)
+            }
+
+            if let tmdbErrorMessage {
+                Text(tmdbErrorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+    }
+
+    private var plexCard: some View {
+        settingsCard(
+            title: "Plex",
+            subtitle: "Connect Plex to personalize Badminton and see what you're watching.",
+            status: plexStatus
+        ) {
+            if plexAuthManager.isAuthenticated {
+                settingsSubcard {
+                    serverPicker
+                }
+                settingsSubcard {
+                    accountPicker
+                }
+                Button("Disconnect Plex", role: .destructive) {
+                    plexAuthManager.signOut()
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Button(plexAuthManager.isAuthenticating ? "Connecting…" : "Connect Plex") {
+                    Task { await plexAuthManager.signIn() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(plexAuthManager.isAuthenticating)
+            }
+
+            if plexAuthManager.isAuthenticating {
+                ProgressView("Waiting for Plex…")
+            }
+
+            if let errorMessage = plexAuthManager.errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+#if os(iOS)
+    private var liveActivityCard: some View {
+        settingsCard(
+            title: "Live Activity",
+            subtitle: "Debug controls for live activity previews.",
+            status: nil
+        ) {
+            Text(liveActivity.status)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Button("Start") {
+                    liveActivity.startSample()
+                }
+                Button("Update") {
+                    liveActivity.updateSample()
+                }
+                Button("End") {
+                    liveActivity.endSample()
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+#endif
+
     @ViewBuilder
     private var serverPicker: some View {
         if plexServers.isLoading {
@@ -162,11 +175,17 @@ struct SettingsView: View {
                     )
                 }
             )
-            Picker("Preferred Server", selection: selection) {
-                Text("Auto").tag(String?.none)
-                ForEach(plexServers.servers) { server in
-                    Text(server.displayName).tag(Optional(server.id))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Preferred Server")
+                    .font(.callout.weight(.semibold))
+                Picker("", selection: selection) {
+                    Text("Auto").tag(String?.none)
+                    ForEach(plexServers.servers) { server in
+                        Text(server.displayName).tag(Optional(server.id))
+                    }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
             }
         } else if let errorMessage = plexServers.errorMessage {
             Text(errorMessage)
@@ -212,6 +231,9 @@ struct SettingsView: View {
                         Text(accountLabel(for: account))
                     }
                 }
+#if os(iOS)
+                .toggleStyle(.switch)
+#endif
                 if !selection.wrappedValue.isEmpty {
                     Button("Show All Accounts") {
                         selection.wrappedValue = []
@@ -257,19 +279,130 @@ struct SettingsView: View {
         !TMDBConfig.apiKey.isEmpty && !TMDBConfig.readAccessToken.isEmpty && !TMDBConfig.redirectURI.isEmpty
     }
 
+    private var tmdbStatus: SettingsStatus? {
+        if authManager.isAuthenticated {
+            return SettingsStatus(text: "Connected", systemImage: "checkmark.circle.fill", color: .green)
+        }
+        if canSignInTMDB {
+            return SettingsStatus(text: "Ready", systemImage: "checkmark.circle", color: .orange)
+        }
+        return SettingsStatus(text: "Needs setup", systemImage: "exclamationmark.triangle.fill", color: .orange)
+    }
+
+    private var plexStatus: SettingsStatus? {
+        if plexAuthManager.isAuthenticated {
+            return SettingsStatus(text: "Connected", systemImage: "checkmark.circle.fill", color: .green)
+        }
+        if plexAuthManager.isAuthenticating {
+            return SettingsStatus(text: "Connecting", systemImage: "arrow.triangle.2.circlepath", color: .orange)
+        }
+        return SettingsStatus(text: "Not connected", systemImage: "xmark.circle.fill", color: .secondary)
+    }
+
+    private var settingsBackground: some View {
+        ZStack {
+            baseBackgroundColor
+            LinearGradient(
+                colors: [Color.primary.opacity(0.08), Color.primary.opacity(0.0)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    private var baseBackgroundColor: Color {
+#if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+#else
+        Color(uiColor: .systemBackground)
+#endif
+    }
+
+    private func settingsCard<Content: View>(
+        title: String,
+        subtitle: String,
+        status: SettingsStatus?,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                Spacer()
+                if let status {
+                    statusPill(status)
+                }
+            }
+            Text(subtitle)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            content()
+        }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+
+    private func settingsSubcard<Content: View>(
+        title: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            content()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func statusPill(_ status: SettingsStatus) -> some View {
+        Label(status.text, systemImage: status.systemImage)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .foregroundStyle(status.color)
+            .background(status.color.opacity(0.15), in: Capsule())
+    }
+
     @ViewBuilder
     private func configRow(title: String, isReady: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(isReady ? .green : .orange)
             Text(title)
                 .font(.subheadline)
             Spacer()
             Text(isReady ? "Set" : "Missing")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(isReady ? .green : .orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background((isReady ? Color.green : Color.orange).opacity(0.15), in: Capsule())
         }
     }
+}
+
+private struct SettingsStatus {
+    let text: String
+    let systemImage: String
+    let color: Color
 }
 
 #Preview {
