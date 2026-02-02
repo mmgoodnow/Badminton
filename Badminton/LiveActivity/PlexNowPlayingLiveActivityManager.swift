@@ -26,11 +26,11 @@ final class PlexNowPlayingLiveActivityManager {
         for item in nowPlaying {
             let activityID = item.liveActivityID
             let subtitle = item.detailSubtitle.isEmpty ? "Now Playing" : item.detailSubtitle
-            let artworkURLString = item.tmdbPosterURL?.absoluteString
+            let artworkFileName = item.tmdbPosterFileName
             let state = PlaybackActivityAttributes.ContentState(
                 title: item.title,
                 subtitle: subtitle,
-                artworkURLString: artworkURLString,
+                artworkFileName: artworkFileName,
                 progress: item.progress,
                 updatedAt: Date()
             )
@@ -46,7 +46,7 @@ final class PlexNowPlayingLiveActivityManager {
                 do {
                     let activity = try Activity.request(attributes: attributes, content: content, pushType: nil)
                     activities[activityID] = activity
-                    if artworkURLString == nil {
+                    if artworkFileName == nil {
                         print("Live Activity missing TMDB artwork for \(item.title)")
                     }
                     print("Live Activity started: \(activityID)")

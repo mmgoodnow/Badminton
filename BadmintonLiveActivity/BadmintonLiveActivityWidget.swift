@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import UIKit
 import WidgetKit
 
 struct BadmintonLiveActivityWidget: Widget {
@@ -43,7 +44,7 @@ private struct LiveActivityContentView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            ArtworkView(urlString: context.state.artworkURLString)
+            ArtworkView(fileName: context.state.artworkFileName)
             VStack(alignment: .leading, spacing: 6) {
                 Text(context.state.title)
                     .font(.headline)
@@ -64,31 +65,45 @@ private struct LiveActivityContentView: View {
 }
 
 private struct ArtworkView: View {
-    let urlString: String?
-    @State private var didLogFailure = false
+    let fileName: String?
 
     var body: some View {
-        let url = urlString.flatMap(URL.init(string:))
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
+        ZStack {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(.quaternary)
+
+            if let image = loadImage() {
                 image
                     .resizable()
                     .scaledToFill()
-            case .failure(let error):
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.quaternary)
-                    .onAppear {
-                        guard !didLogFailure else { return }
-                        didLogFailure = true
-                        print("Live Activity artwork load failed: \(error.localizedDescription)")
-                    }
-            default:
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.quaternary)
             }
         }
         .frame(width: 54, height: 80)
         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private func loadImage() -> Image? {
+        guard let fileName,
+              let url = LiveActivityFileStore.fileURL(for: fileName),
+              let image = UIImage(contentsOfFile: url.path) else {
+            return nil
+        }
+        return Image(uiImage: image)
+    }
+}
+
+private enum LiveActivityFileStore {
+    private static let appGroupID = "group.com.bebopbeluga.Badminton"
+    private static let directoryName = "LiveActivityArt"
+
+    static func fileURL(for fileName: String) -> URL? {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else {
+            return nil
+        }
+        let directoryURL = containerURL
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Caches", isDirectory: true)
+            .appendingPathComponent(directoryName, isDirectory: true)
+        return directoryURL.appendingPathComponent(fileName)
     }
 }

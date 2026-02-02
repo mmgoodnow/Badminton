@@ -458,7 +458,7 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let subtitle: String
     let detailSubtitle: String
     let imageURL: URL
-    let tmdbPosterURL: URL?
+    let tmdbPosterFileName: String?
     let seriesTitle: String?
     let seasonNumber: Int?
     let episodeNumber: Int?
@@ -484,7 +484,7 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
         "plex-\(sessionKey ?? ratingKey)"
     }
 
-    func settingTMDBPosterURL(_ url: URL?) -> PlexRecentlyWatchedItem {
+    func settingTMDBPosterFileName(_ fileName: String?) -> PlexRecentlyWatchedItem {
         PlexRecentlyWatchedItem(
             id: id,
             ratingKey: ratingKey,
@@ -493,7 +493,7 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
             subtitle: subtitle,
             detailSubtitle: detailSubtitle,
             imageURL: imageURL,
-            tmdbPosterURL: url,
+            tmdbPosterFileName: fileName,
             seriesTitle: seriesTitle,
             seasonNumber: seasonNumber,
             episodeNumber: episodeNumber,
@@ -762,7 +762,7 @@ final class HomeViewModel: ObservableObject {
     private var plexShowIDCache: [String: Int] = [:]
     private var plexPrefetchedKeys: Set<String> = []
     private var plexPrefetchTask: Task<Void, Never>?
-    private var plexTMDBPosterCache: [String: URL] = [:]
+    private var plexTMDBPosterCache: [String: String] = [:]
     private var plexTMDBPosterFailures: Set<String> = []
     private var plexNowPlayingArtworkTask: Task<Void, Never>?
     private let plexAccountResolver = PlexAccountResolver.shared
@@ -912,7 +912,7 @@ final class HomeViewModel: ObservableObject {
                     subtitle: display.subtitle,
                     detailSubtitle: display.subtitle,
                     imageURL: imageURL,
-                    tmdbPosterURL: nil,
+                    tmdbPosterFileName: nil,
                     seriesTitle: item.grandparentTitle,
                     seasonNumber: item.parentIndex,
                     episodeNumber: item.index,
@@ -1076,7 +1076,7 @@ final class HomeViewModel: ObservableObject {
                 subtitle: subtitle,
                 detailSubtitle: display.subtitle,
                 imageURL: imageURL,
-                tmdbPosterURL: nil,
+                tmdbPosterFileName: nil,
                 seriesTitle: item.grandparentTitle,
                 seasonNumber: item.parentIndex,
                 episodeNumber: item.index,
@@ -1114,11 +1114,11 @@ final class HomeViewModel: ObservableObject {
         preferredServerID: String?
     ) async {
         guard !items.isEmpty else { return }
-        var updates: [String: URL] = [:]
+        var updates: [String: String] = [:]
 
         for item in items {
             if Task.isCancelled { return }
-            if item.tmdbPosterURL != nil {
+            if item.tmdbPosterFileName != nil {
                 continue
             }
             if let cached = plexTMDBPosterCache[item.ratingKey] {
@@ -1133,7 +1133,12 @@ final class HomeViewModel: ObservableObject {
                 token: token,
                 preferredServerID: preferredServerID
             ) {
-                updates[item.ratingKey] = url
+                if let fileName = await storeTMDBPoster(url, for: item) {
+                    updates[item.ratingKey] = fileName
+                } else {
+                    plexTMDBPosterFailures.insert(item.ratingKey)
+                    print("TMDB artwork download failed for \(item.title)")
+                }
             } else {
                 plexTMDBPosterFailures.insert(item.ratingKey)
                 print("TMDB artwork unavailable for \(item.title)")
@@ -1143,8 +1148,8 @@ final class HomeViewModel: ObservableObject {
         guard !updates.isEmpty else { return }
         plexTMDBPosterCache.merge(updates) { _, new in new }
         let updatedNowPlaying = plexNowPlaying.map { item in
-            guard item.tmdbPosterURL == nil, let url = updates[item.ratingKey] else { return item }
-            return item.settingTMDBPosterURL(url)
+            guard item.tmdbPosterFileName == nil, let fileName = updates[item.ratingKey] else { return item }
+            return item.settingTMDBPosterFileName(fileName)
         }
         plexNowPlaying = updatedNowPlaying
 #if os(iOS)
@@ -1305,6 +1310,28 @@ final class HomeViewModel: ObservableObject {
 
         guard let posterPath else { return nil }
         return posterURL(path: posterPath)
+    }
+
+    private func storeTMDBPoster(_ url: URL, for item: PlexRecentlyWatchedItem) async -> String? {
+        let safeKey = item.ratingKey.replacingOccurrences(of: "/", with: "-")
+        let fileName = "tmdb-\(safeKey)-\(url.lastPathComponent)"
+        if let existingURL = LiveActivityArtworkStore.fileURL(for: fileName),
+           FileManager.default.fileExists(atPath: existingURL.path) {
+            return fileName
+        }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                return nil
+            }
+            guard LiveActivityArtworkStore.store(data: data, fileName: fileName) != nil else {
+                return nil
+            }
+            return fileName
+        } catch {
+            print("TMDB artwork download error for \(item.title): \(error)")
+            return nil
+        }
     }
 
     func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexResolveResult {
@@ -1722,6 +1749,41 @@ final class HomeViewModel: ObservableObject {
             return fallback
         }
         return sizes.last ?? fallback
+    }
+}
+
+private enum LiveActivityArtworkStore {
+    private static let appGroupID = "group.com.bebopbeluga.Badminton"
+    private static let directoryName = "LiveActivityArt"
+
+    static func fileURL(for fileName: String) -> URL? {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else {
+            return nil
+        }
+        let directoryURL = containerURL
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Caches", isDirectory: true)
+            .appendingPathComponent(directoryName, isDirectory: true)
+        return directoryURL.appendingPathComponent(fileName)
+    }
+
+    static func store(data: Data, fileName: String) -> URL? {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else {
+            return nil
+        }
+        let directoryURL = containerURL
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Caches", isDirectory: true)
+            .appendingPathComponent(directoryName, isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            let fileURL = directoryURL.appendingPathComponent(fileName)
+            try data.write(to: fileURL, options: .atomic)
+            return fileURL
+        } catch {
+            print("Live Activity artwork store failed: \(error)")
+            return nil
+        }
     }
 }
 
