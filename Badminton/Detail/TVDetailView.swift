@@ -532,14 +532,16 @@ final class TVDetailViewModel: ObservableObject {
             return
         }
 
+        let tvID = self.tvID
+        let forceFlag = force
         let signpost = Signpost.begin(
             "TVDetailLoad",
             log: SignpostLog.tmdb,
             "id=%{public}d force=%{public}d",
             tvID,
-            force ? 1 : 0
+            forceFlag ? 1 : 0
         )
-        AppLog.tmdb.info("TVDetailLoad start id=\(tvID, privacy: .public) force=\(force, privacy: .public)")
+        AppLog.tmdb.info("TVDetailLoad start id=\(tvID, privacy: .public) force=\(forceFlag, privacy: .public)")
         defer {
             signpost.end()
             AppLog.tmdb.info("TVDetailLoad end id=\(tvID, privacy: .public)")
