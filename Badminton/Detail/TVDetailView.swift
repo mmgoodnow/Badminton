@@ -513,7 +513,8 @@ final class TVDetailViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let result = try await Task.detached(priority: .userInitiated) { [client, tvID] in
+            let result = try await Task.detached(priority: .userInitiated) { [tvID] in
+                let client = TMDBAPIClient()
                 async let config = client.getImageConfiguration()
                 async let detail: TMDBTVSeriesDetail = client.getV3(path: "/3/tv/\(tvID)")
                 async let credits: TMDBCredits = client.getV3(path: "/3/tv/\(tvID)/credits")
@@ -582,7 +583,7 @@ final class TVDetailViewModel: ObservableObject {
         return sizes.last ?? fallback
     }
 
-    private static func latestSeasonNumber(from detail: TMDBTVSeriesDetail) -> Int? {
+    private nonisolated static func latestSeasonNumber(from detail: TMDBTVSeriesDetail) -> Int? {
         if let last = detail.lastEpisodeToAir?.seasonNumber {
             return last
         }
@@ -592,7 +593,7 @@ final class TVDetailViewModel: ObservableObject {
             .max()
     }
 
-    private static func latestEpisodes(from season: TMDBTVSeasonDetail) -> [TMDBEpisode] {
+    private nonisolated static func latestEpisodes(from season: TMDBTVSeasonDetail) -> [TMDBEpisode] {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
