@@ -458,6 +458,7 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
     let subtitle: String
     let detailSubtitle: String
     let imageURL: URL
+    let tmdbPosterURL: URL?
     let seriesTitle: String?
     let seasonNumber: Int?
     let episodeNumber: Int?
@@ -481,6 +482,28 @@ struct PlexRecentlyWatchedItem: Identifiable, Hashable {
 
     var liveActivityID: String {
         "plex-\(sessionKey ?? ratingKey)"
+    }
+
+    func settingTMDBPosterURL(_ url: URL?) -> PlexRecentlyWatchedItem {
+        PlexRecentlyWatchedItem(
+            id: id,
+            ratingKey: ratingKey,
+            type: type,
+            title: title,
+            subtitle: subtitle,
+            detailSubtitle: detailSubtitle,
+            imageURL: imageURL,
+            tmdbPosterURL: url,
+            seriesTitle: seriesTitle,
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber,
+            year: year,
+            originallyAvailableAt: originallyAvailableAt,
+            showRatingKey: showRatingKey,
+            sessionKey: sessionKey,
+            viewOffset: viewOffset,
+            duration: duration
+        )
     }
 }
 
@@ -739,6 +762,9 @@ final class HomeViewModel: ObservableObject {
     private var plexShowIDCache: [String: Int] = [:]
     private var plexPrefetchedKeys: Set<String> = []
     private var plexPrefetchTask: Task<Void, Never>?
+    private var plexTMDBPosterCache: [String: URL] = [:]
+    private var plexTMDBPosterFailures: Set<String> = []
+    private var plexNowPlayingArtworkTask: Task<Void, Never>?
     private let plexAccountResolver = PlexAccountResolver.shared
 #if os(iOS)
     private let plexLiveActivityManager = PlexNowPlayingLiveActivityManager()
@@ -815,6 +841,7 @@ final class HomeViewModel: ObservableObject {
             plexTokenLoaded = nil
             plexPreferredServerLoaded = nil
             plexPreferredAccountLoaded = []
+            plexNowPlayingArtworkTask?.cancel()
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
@@ -885,6 +912,7 @@ final class HomeViewModel: ObservableObject {
                     subtitle: display.subtitle,
                     detailSubtitle: display.subtitle,
                     imageURL: imageURL,
+                    tmdbPosterURL: nil,
                     seriesTitle: item.grandparentTitle,
                     seasonNumber: item.parentIndex,
                     episodeNumber: item.index,
@@ -902,6 +930,11 @@ final class HomeViewModel: ObservableObject {
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
             startPlexPrefetch(token: token, preferredServerID: preferredServerID)
+            startPlexNowPlayingArtworkResolution(
+                items: plexNowPlaying,
+                token: token,
+                preferredServerID: preferredServerID
+            )
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
@@ -929,6 +962,7 @@ final class HomeViewModel: ObservableObject {
     ) async {
         guard let token, !token.isEmpty else {
             plexNowPlaying = []
+            plexNowPlayingArtworkTask?.cancel()
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
@@ -974,6 +1008,11 @@ final class HomeViewModel: ObservableObject {
             )
             plexNowPlaying = nowPlayingPayload.items
             plexRecent = plexRecent.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
+            startPlexNowPlayingArtworkResolution(
+                items: plexNowPlaying,
+                token: token,
+                preferredServerID: preferredServerID
+            )
 #if os(iOS)
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
@@ -1037,6 +1076,7 @@ final class HomeViewModel: ObservableObject {
                 subtitle: subtitle,
                 detailSubtitle: display.subtitle,
                 imageURL: imageURL,
+                tmdbPosterURL: nil,
                 seriesTitle: item.grandparentTitle,
                 seasonNumber: item.parentIndex,
                 episodeNumber: item.index,
@@ -1049,6 +1089,222 @@ final class HomeViewModel: ObservableObject {
             )
         }
         return (mapped, sourceIDs)
+    }
+
+    private func startPlexNowPlayingArtworkResolution(
+        items: [PlexRecentlyWatchedItem],
+        token: String,
+        preferredServerID: String?
+    ) {
+        plexNowPlayingArtworkTask?.cancel()
+        guard !items.isEmpty else { return }
+        plexNowPlayingArtworkTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.resolveNowPlayingTMDBArtwork(
+                items: items,
+                token: token,
+                preferredServerID: preferredServerID
+            )
+        }
+    }
+
+    private func resolveNowPlayingTMDBArtwork(
+        items: [PlexRecentlyWatchedItem],
+        token: String,
+        preferredServerID: String?
+    ) async {
+        guard !items.isEmpty else { return }
+        var updates: [String: URL] = [:]
+
+        for item in items {
+            if Task.isCancelled { return }
+            if item.tmdbPosterURL != nil {
+                continue
+            }
+            if let cached = plexTMDBPosterCache[item.ratingKey] {
+                updates[item.ratingKey] = cached
+                continue
+            }
+            if plexTMDBPosterFailures.contains(item.ratingKey) {
+                continue
+            }
+            if let url = await resolveTMDBPosterURL(
+                for: item,
+                token: token,
+                preferredServerID: preferredServerID
+            ) {
+                updates[item.ratingKey] = url
+            } else {
+                plexTMDBPosterFailures.insert(item.ratingKey)
+                print("TMDB artwork unavailable for \(item.title)")
+            }
+        }
+
+        guard !updates.isEmpty else { return }
+        plexTMDBPosterCache.merge(updates) { _, new in new }
+        let updatedNowPlaying = plexNowPlaying.map { item in
+            guard item.tmdbPosterURL == nil, let url = updates[item.ratingKey] else { return item }
+            return item.settingTMDBPosterURL(url)
+        }
+        plexNowPlaying = updatedNowPlaying
+#if os(iOS)
+        plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
+#endif
+    }
+
+    private func resolveTMDBPosterURL(
+        for item: PlexRecentlyWatchedItem,
+        token: String,
+        preferredServerID: String?
+    ) async -> URL? {
+        let typeHint = item.type?.lowercased()
+        let isEpisode = item.isEpisode || typeHint == "episode"
+        var tmdbID: Int?
+        var tmdbType: String?
+        var posterPath: String?
+
+        if let cachedRoute = plexRouteCache[item.ratingKey] {
+            switch cachedRoute {
+            case .movie(let id, _, let cachedPosterPath):
+                tmdbID = id
+                tmdbType = "movie"
+                posterPath = cachedPosterPath
+            case .tv(let id, _, let cachedPosterPath):
+                tmdbID = id
+                tmdbType = "tv"
+                posterPath = cachedPosterPath
+            case .episode(let tvID, _, _, _, _):
+                tmdbID = tvID
+                tmdbType = "tv"
+            }
+        }
+
+        if isEpisode,
+           tmdbID == nil,
+           let showRatingKey = item.showRatingKey,
+           let cachedShowID = plexShowIDCache[showRatingKey] {
+            tmdbID = cachedShowID
+            tmdbType = "tv"
+        }
+
+        if posterPath == nil {
+            var metadata: PlexMetadataItem?
+            do {
+                metadata = try await plexClient.fetchMetadata(
+                    ratingKey: item.ratingKey,
+                    token: token,
+                    preferredServerID: preferredServerID
+                )
+            } catch {
+                print("TMDB artwork Plex metadata failed for \(item.title): \(error)")
+            }
+
+            let metadataType = metadata?.type?.lowercased()
+            if tmdbType == nil {
+                switch metadataType {
+                case "movie":
+                    tmdbType = "movie"
+                case "show", "episode":
+                    tmdbType = "tv"
+                default:
+                    if typeHint == "movie" {
+                        tmdbType = "movie"
+                    } else if isEpisode || typeHint == "show" {
+                        tmdbType = "tv"
+                    }
+                }
+            }
+
+            let guidValues = Self.extractGuids(from: metadata)
+            if let parsedID = Self.parseExternalIDs(from: guidValues).tmdbID {
+                tmdbID = parsedID
+                if let tmdbType, !isEpisode, plexRouteCache[item.ratingKey] == nil {
+                    let route: PlexNavigationRoute = tmdbType == "movie"
+                    ? .movie(id: parsedID, title: item.title, posterPath: nil)
+                    : .tv(id: parsedID, title: item.seriesTitle ?? item.title, posterPath: nil)
+                    plexRouteCache[item.ratingKey] = route
+                }
+            }
+
+            if isEpisode, tmdbID == nil {
+                let showRatingKey = item.showRatingKey ?? metadata?.grandparentRatingKey
+                if let showRatingKey {
+                    do {
+                        let showMetadata = try await plexClient.fetchMetadata(
+                            ratingKey: showRatingKey,
+                            token: token,
+                            preferredServerID: preferredServerID
+                        )
+                        let showGuids = Self.extractGuids(from: showMetadata)
+                        if let showTMDB = Self.parseExternalIDs(from: showGuids).tmdbID {
+                            tmdbID = showTMDB
+                            tmdbType = "tv"
+                            plexShowIDCache[showRatingKey] = showTMDB
+                        }
+                    } catch {
+                        print("TMDB artwork show metadata failed for \(item.title): \(error)")
+                    }
+                }
+            }
+        }
+
+        if posterPath == nil, let tmdbID, let tmdbType {
+            do {
+                if tmdbType == "movie" {
+                    let detail: TMDBMovieDetail = try await client.getV3(path: "/3/movie/\(tmdbID)")
+                    posterPath = detail.posterPath
+                } else {
+                    let detail: TMDBTVSeriesDetail = try await client.getV3(path: "/3/tv/\(tmdbID)")
+                    posterPath = detail.posterPath
+                }
+            } catch {
+                print("TMDB artwork detail fetch failed for \(item.title): \(error)")
+            }
+        }
+
+        if posterPath == nil {
+            do {
+                if tmdbType == "movie" || typeHint == "movie" {
+                    let response: TMDBPagedResults<TMDBMovieSummary> = try await client.getV3(
+                        path: "/3/search/movie",
+                        queryItems: movieSearchQueryItems(title: item.title, year: item.year)
+                    )
+                    if let movie = response.results.first {
+                        posterPath = movie.posterPath
+                        if plexRouteCache[item.ratingKey] == nil {
+                            plexRouteCache[item.ratingKey] = .movie(
+                                id: movie.id,
+                                title: movie.title,
+                                posterPath: movie.posterPath
+                            )
+                        }
+                    }
+                } else {
+                    let query = item.seriesTitle ?? item.title
+                    let response: TMDBPagedResults<TMDBTVSeriesSummary> = try await client.getV3(
+                        path: "/3/search/tv",
+                        queryItems: tvSearchQueryItems(title: query, year: inferredYear(from: item))
+                    )
+                    if let tv = response.results.first {
+                        posterPath = tv.posterPath
+                        if isEpisode, let showRatingKey = item.showRatingKey {
+                            plexShowIDCache[showRatingKey] = tv.id
+                        } else if plexRouteCache[item.ratingKey] == nil {
+                            plexRouteCache[item.ratingKey] = .tv(
+                                id: tv.id,
+                                title: tv.name,
+                                posterPath: tv.posterPath
+                            )
+                        }
+                    }
+                }
+            } catch {
+                print("TMDB artwork search failed for \(item.title): \(error)")
+            }
+        }
+
+        guard let posterPath else { return nil }
+        return posterURL(path: posterPath)
     }
 
     func resolvePlexRoute(for item: PlexRecentlyWatchedItem, token: String, preferredServerID: String?) async -> PlexResolveResult {
