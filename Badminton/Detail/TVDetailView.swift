@@ -513,26 +513,31 @@ final class TVDetailViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            async let config = client.getImageConfiguration()
-            async let detail: TMDBTVSeriesDetail = client.getV3(path: "/3/tv/\(tvID)")
-            async let credits: TMDBCredits = client.getV3(path: "/3/tv/\(tvID)/credits")
-            async let videos: TMDBVideoList = client.getV3(path: "/3/tv/\(tvID)/videos")
+            let result = try await Task.detached(priority: .userInitiated) { [client, tvID] in
+                async let config = client.getImageConfiguration()
+                async let detail: TMDBTVSeriesDetail = client.getV3(path: "/3/tv/\(tvID)")
+                async let credits: TMDBCredits = client.getV3(path: "/3/tv/\(tvID)/credits")
+                async let videos: TMDBVideoList = client.getV3(path: "/3/tv/\(tvID)/videos")
 
-            let (configResponse, detailResponse, creditsResponse, videosResponse) = try await (config, detail, credits, videos)
-            imageConfig = configResponse.images
-            self.detail = detailResponse
-            self.credits = creditsResponse
-            latestEpisodes = []
-            latestSeasonNumber = nil
-            trailers = videosResponse.results.filter { $0.type == "Trailer" }
-
-            if let seasonNumber = latestSeasonNumber(from: detailResponse) {
-                latestSeasonNumber = seasonNumber
-                if let seasonDetail: TMDBTVSeasonDetail = try? await client.getV3(path: "/3/tv/\(tvID)/season/\(seasonNumber)") {
-                    latestEpisodes = latestEpisodes(from: seasonDetail)
+                let (configResponse, detailResponse, creditsResponse, videosResponse) = try await (config, detail, credits, videos)
+                var latestEpisodes: [TMDBEpisode] = []
+                var latestSeasonNumber: Int? = nil
+                if let seasonNumber = Self.latestSeasonNumber(from: detailResponse) {
+                    latestSeasonNumber = seasonNumber
+                    if let seasonDetail: TMDBTVSeasonDetail = try? await client.getV3(path: "/3/tv/\(tvID)/season/\(seasonNumber)") {
+                        latestEpisodes = Self.latestEpisodes(from: seasonDetail)
+                    }
                 }
-            }
+                let trailers = videosResponse.results.filter { $0.type == "Trailer" }
+                return (configResponse.images, detailResponse, creditsResponse, trailers, latestSeasonNumber, latestEpisodes)
+            }.value
 
+            imageConfig = result.0
+            detail = result.1
+            credits = result.2
+            trailers = result.3
+            latestSeasonNumber = result.4
+            latestEpisodes = result.5
             hasLoaded = true
         } catch is CancellationError {
         } catch {
@@ -577,7 +582,7 @@ final class TVDetailViewModel: ObservableObject {
         return sizes.last ?? fallback
     }
 
-    private func latestSeasonNumber(from detail: TMDBTVSeriesDetail) -> Int? {
+    private static func latestSeasonNumber(from detail: TMDBTVSeriesDetail) -> Int? {
         if let last = detail.lastEpisodeToAir?.seasonNumber {
             return last
         }
@@ -587,7 +592,19 @@ final class TVDetailViewModel: ObservableObject {
             .max()
     }
 
-    private func latestEpisodes(from season: TMDBTVSeasonDetail) -> [TMDBEpisode] {
+    private static func latestEpisodes(from season: TMDBTVSeasonDetail) -> [TMDBEpisode] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        func isFutureEpisode(_ airDate: String?) -> Bool {
+            guard let airDate, let date = formatter.date(from: airDate) else {
+                return false
+            }
+            return date > Date()
+        }
+
         let sorted = season.episodes.sorted { lhs, rhs in
             switch (lhs.airDate, rhs.airDate) {
             case let (l?, r?):
@@ -602,13 +619,6 @@ final class TVDetailViewModel: ObservableObject {
             }
         }
         return sorted.filter { !isFutureEpisode($0.airDate) }
-    }
-
-    func isFutureEpisode(_ airDate: String?) -> Bool {
-        guard let airDate, let date = TMDBDateFormatter.input.date(from: airDate) else {
-            return false
-        }
-        return date > Date()
     }
 }
 
