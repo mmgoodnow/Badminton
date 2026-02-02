@@ -356,8 +356,15 @@ final class PersonDetailViewModel: ObservableObject {
         } else if let job = credit.job, !job.isEmpty {
             parts.append(job)
         }
-        if let date = credit.releaseDate ?? credit.firstAirDate, !date.isEmpty {
-            parts.append(String(date.prefix(4)))
+        let appearanceYear = yearString(from: appearanceDate(for: credit))
+        if let appearanceYear {
+            parts.append(appearanceYear)
+        }
+        if credit.mediaType == .tv {
+            if let startYear = yearString(from: credit.firstAirDate),
+               startYear != appearanceYear {
+                parts.append("started \(startYear)")
+            }
         }
         return parts.joined(separator: " • ")
     }
@@ -366,10 +373,48 @@ final class PersonDetailViewModel: ObservableObject {
         let castKeys = Set(cast.map { "\($0.mediaType.rawValue):\($0.id)" })
         let merged = cast + crew.filter { !castKeys.contains("\($0.mediaType.rawValue):\($0.id)") }
         let sorted = merged.sorted { (lhs, rhs) in
-            (lhs.popularity ?? 0) > (rhs.popularity ?? 0)
+            let lhsIsSelf = isSelfRole(lhs)
+            let rhsIsSelf = isSelfRole(rhs)
+            if lhsIsSelf != rhsIsSelf {
+                return !lhsIsSelf
+            }
+            let lhsDate = appearanceDate(for: lhs) ?? ""
+            let rhsDate = appearanceDate(for: rhs) ?? ""
+            if lhsDate != rhsDate {
+                return lhsDate > rhsDate
+            }
+            let lhsPopularity = lhs.popularity ?? 0
+            let rhsPopularity = rhs.popularity ?? 0
+            if lhsPopularity != rhsPopularity {
+                return lhsPopularity > rhsPopularity
+            }
+            return lhs.displayTitle < rhs.displayTitle
         }
         credits = Array(sorted.prefix(40))
-        knownFor = Array(sorted.prefix(12))
+        let knownForCandidates = sorted.filter { !isSelfRole($0) }
+        let knownForSource = knownForCandidates.isEmpty ? sorted : knownForCandidates
+        knownFor = Array(knownForSource.prefix(12))
+    }
+
+    private func appearanceDate(for credit: TMDBMediaCredit) -> String? {
+        switch credit.mediaType {
+        case .tv:
+            return credit.lastAirDate ?? credit.firstAirDate
+        case .movie:
+            return credit.releaseDate ?? credit.firstAirDate ?? credit.lastAirDate
+        case .person, .unknown:
+            return credit.releaseDate ?? credit.firstAirDate ?? credit.lastAirDate
+        }
+    }
+
+    private func yearString(from dateString: String?) -> String? {
+        guard let dateString, dateString.count >= 4 else { return nil }
+        return String(dateString.prefix(4))
+    }
+
+    private func isSelfRole(_ credit: TMDBMediaCredit) -> Bool {
+        guard let character = credit.character, !character.isEmpty else { return false }
+        return character.range(of: "self", options: [.caseInsensitive, .diacriticInsensitive]) != nil
     }
 
     private func imageURL(path: String?, sizes: [String]?, fallback: String) -> URL? {

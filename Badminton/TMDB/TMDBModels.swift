@@ -260,6 +260,7 @@ struct TMDBMediaCredit: Decodable, Identifiable, Hashable {
     let backdropPath: String?
     let releaseDate: String?
     let firstAirDate: String?
+    let lastAirDate: String?
     let character: String?
     let job: String?
     let department: String?
