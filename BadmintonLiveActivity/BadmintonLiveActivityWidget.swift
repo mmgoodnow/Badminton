@@ -43,14 +43,14 @@ private struct LiveActivityContentView: View {
     let context: ActivityViewContext<PlaybackActivityAttributes>
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 14) {
             ArtworkView(fileName: context.state.artworkFileName)
             VStack(alignment: .leading, spacing: 6) {
                 Text(context.state.title)
-                    .font(.headline)
+                    .font(.title3.weight(.semibold))
                     .lineLimit(1)
                 Text(context.state.subtitle)
-                    .font(.subheadline)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if let progress = context.state.progress {
@@ -58,9 +58,10 @@ private struct LiveActivityContentView: View {
                         .progressViewStyle(.linear)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
 }
 
@@ -78,8 +79,8 @@ private struct ArtworkView: View {
                     .scaledToFill()
             }
         }
-        .frame(width: 54, height: 80)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .frame(width: 64, height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func loadImage() -> Image? {
