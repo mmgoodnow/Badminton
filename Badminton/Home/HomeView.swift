@@ -384,6 +384,10 @@ struct HomeView: View {
 
     private func handlePlexSelection(_ item: PlexRecentlyWatchedItem) {
         guard plexResolvingItem == nil else { return }
+        if let cachedRoute = viewModel.cachedPlexRoute(for: item) {
+            navigationPath.append(cachedRoute)
+            return
+        }
         guard let token = plexAuthManager.authToken, !token.isEmpty else {
             plexFailureContext = PlexResolveFailureContext(
                 item: item,
@@ -1738,6 +1742,30 @@ final class HomeViewModel: ObservableObject {
         guard let dateString, dateString.count >= 4 else { return nil }
         let prefix = dateString.prefix(4)
         return Int(prefix)
+    }
+
+    func cachedPlexRoute(for item: PlexRecentlyWatchedItem) -> PlexNavigationRoute? {
+        if let cached = plexRouteCache[item.ratingKey] {
+            return cached
+        }
+
+        if item.isEpisode,
+           let showRatingKey = item.showRatingKey,
+           let cachedShowID = plexShowIDCache[showRatingKey],
+           let seasonNumber = item.seasonNumber,
+           let episodeNumber = item.episodeNumber {
+            let route = PlexNavigationRoute.episode(
+                tvID: cachedShowID,
+                seasonNumber: seasonNumber,
+                episodeNumber: episodeNumber,
+                title: item.title,
+                stillPath: nil
+            )
+            plexRouteCache[item.ratingKey] = route
+            return route
+        }
+
+        return nil
     }
 
     func posterURL(path: String?) -> URL? {
