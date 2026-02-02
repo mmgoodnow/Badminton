@@ -7,6 +7,11 @@ enum SignpostLog {
     static let tmdb = OSLog(subsystem: subsystem, category: "TMDB")
 }
 
+enum AppLog {
+    static let navigation = Logger(subsystem: SignpostLog.subsystem, category: "Navigation")
+    static let tmdb = Logger(subsystem: SignpostLog.subsystem, category: "TMDB")
+}
+
 struct SignpostInterval {
     let name: StaticString
     let log: OSLog

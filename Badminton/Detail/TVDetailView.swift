@@ -52,6 +52,7 @@ struct TVDetailView: View {
         .macOSSwipeToDismiss()
         .onAppear {
             Signpost.event("TVDetailAppear", log: SignpostLog.navigation, "id=%{public}d", tvID)
+            AppLog.navigation.info("TVDetailAppear id=\(tvID, privacy: .public)")
         }
         .task {
             await viewModel.load()
@@ -537,7 +538,11 @@ final class TVDetailViewModel: ObservableObject {
             tvID,
             force ? 1 : 0
         )
-        defer { signpost.end() }
+        AppLog.tmdb.info("TVDetailLoad start id=\(tvID, privacy: .public) force=\(force, privacy: .public)")
+        defer {
+            signpost.end()
+            AppLog.tmdb.info("TVDetailLoad end id=\(tvID, privacy: .public)")
+        }
 
         isLoading = true
         errorMessage = nil

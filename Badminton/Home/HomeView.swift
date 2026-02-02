@@ -311,6 +311,9 @@ struct HomeView: View {
                                     item.id,
                                     item.displayTitle
                                 )
+                                AppLog.navigation.info(
+                                    "TMDBTVTap id=\(item.id, privacy: .public) title=\(item.displayTitle, privacy: .public)"
+                                )
                                 navigationPath.append(
                                     TMDBNavigationRoute.tv(
                                         id: item.id,
