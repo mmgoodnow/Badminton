@@ -146,9 +146,11 @@ struct HomeView: View {
             .refreshable {
                 await refreshAll(force: true)
             }
+#if os(macOS) || targetEnvironment(macCatalyst)
             .focusedSceneValue(\.badmintonRefreshAction) {
                 await refreshAll(force: true)
             }
+#endif
             .onChange(of: scenePhase) { newPhase in
                 guard newPhase == .active else { return }
                 let now = Date()

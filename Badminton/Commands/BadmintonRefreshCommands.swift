@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if os(macOS) || targetEnvironment(macCatalyst)
 private struct BadmintonRefreshActionKey: FocusedValueKey {
     typealias Value = () async -> Void
 }
@@ -24,3 +25,4 @@ struct BadmintonRefreshCommands: Commands {
         }
     }
 }
+#endif

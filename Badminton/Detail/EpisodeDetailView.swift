@@ -64,9 +64,11 @@ struct EpisodeDetailView: View {
         .refreshable {
             await viewModel.load(force: true)
         }
+#if os(macOS) || targetEnvironment(macCatalyst)
         .focusedSceneValue(\.badmintonRefreshAction) {
             await viewModel.load(force: true)
         }
+#endif
     }
 
     private var header: some View {

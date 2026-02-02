@@ -11,8 +11,10 @@ struct BadmintonApp: App {
                 .environmentObject(authManager)
                 .environmentObject(plexAuthManager)
         }
+#if os(macOS) || targetEnvironment(macCatalyst)
         .commands {
             BadmintonRefreshCommands()
         }
+#endif
     }
 }
