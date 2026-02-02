@@ -304,6 +304,13 @@ struct HomeView: View {
                         Button {
                             switch item {
                             case .tv:
+                                Signpost.event(
+                                    "TMDBTVTap",
+                                    log: SignpostLog.navigation,
+                                    "id=%{public}d title=%{public}@",
+                                    item.id,
+                                    item.displayTitle
+                                )
                                 navigationPath.append(
                                     TMDBNavigationRoute.tv(
                                         id: item.id,

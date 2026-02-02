@@ -50,6 +50,9 @@ struct TVDetailView: View {
 #endif
         .imageLightbox(item: $lightboxItem)
         .macOSSwipeToDismiss()
+        .onAppear {
+            Signpost.event("TVDetailAppear", log: SignpostLog.navigation, "id=%{public}d", tvID)
+        }
         .task {
             await viewModel.load()
         }
@@ -106,6 +109,23 @@ struct TVDetailView: View {
     @ViewBuilder
     private var genreChips: some View {
         if let genres = viewModel.detail?.genres, !genres.isEmpty {
+            #if os(iOS)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 72, maximum: 160), spacing: 6, alignment: .leading)],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                ForEach(genres, id: \.id) { genre in
+                    Text(genre.name)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            #else
             FlowLayout(spacing: 6) {
                 ForEach(genres, id: \.id) { genre in
                     Text(genre.name)
@@ -116,6 +136,7 @@ struct TVDetailView: View {
                         .clipShape(Capsule())
                 }
             }
+            #endif
         }
     }
 
@@ -508,6 +529,15 @@ final class TVDetailViewModel: ObservableObject {
             errorMessage = "Missing TMDB_API_KEY."
             return
         }
+
+        let signpost = Signpost.begin(
+            "TVDetailLoad",
+            log: SignpostLog.tmdb,
+            "id=%{public}d force=%{public}d",
+            tvID,
+            force ? 1 : 0
+        )
+        defer { signpost.end() }
 
         isLoading = true
         errorMessage = nil
