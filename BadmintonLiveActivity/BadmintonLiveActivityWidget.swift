@@ -45,6 +45,7 @@ private struct LiveActivityContentView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             ArtworkView(fileName: context.state.artworkFileName)
+                .padding(.vertical, 4)
             VStack(alignment: .leading, spacing: 6) {
                 Text(context.state.title)
                     .font(.title3.weight(.semibold))
