@@ -128,7 +128,7 @@ struct PersonDetailView: View {
                         ForEach(viewModel.knownFor) { credit in
                             let card = CreditCardView(
                                 title: credit.displayTitle,
-                                subtitle: viewModel.creditSubtitle(credit),
+                                subtitle: viewModel.creditSubtitle(credit, includeAge: false),
                                 imageURL: viewModel.posterURL(path: credit.posterPath)
                             )
                             if credit.mediaType == .movie || credit.mediaType == .tv {
@@ -153,39 +153,29 @@ struct PersonDetailView: View {
             Text("Credits")
                 .font(.headline)
 
-            if viewModel.creditGroups.isEmpty {
+            if viewModel.credits.isEmpty {
                 Text("No credits available")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(viewModel.creditGroups) { group in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(group.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(group.credits) { credit in
-                                    let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
-                                    let row = CreditRowView(
-                                        title: credit.displayTitle,
-                                        subtitle: viewModel.creditSubtitle(credit, includeYear: false),
-                                        imageURL: viewModel.posterURL(path: credit.posterPath),
-                                        showChevron: isTappable
-                                    )
-                                    if isTappable {
-                                        NavigationLink {
-                                            creditDestination(credit)
-                                        } label: {
-                                            row
-                                        }
-                                        .buttonStyle(.plain)
-                                    } else {
-                                        row
-                                    }
-                                }
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(viewModel.credits) { credit in
+                        let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
+                        let row = CreditRowView(
+                            title: credit.displayTitle,
+                            subtitle: viewModel.creditSubtitle(credit, includeYear: true, includeAge: true),
+                            imageURL: viewModel.posterURL(path: credit.posterPath),
+                            showChevron: isTappable
+                        )
+                        if isTappable {
+                            NavigationLink {
+                                creditDestination(credit)
+                            } label: {
+                                row
                             }
+                            .buttonStyle(.plain)
+                        } else {
+                            row
                         }
                     }
                 }
@@ -329,24 +319,6 @@ private struct CreditRowView: View {
     }
 }
 
-struct CreditYearGroup: Identifiable {
-    let year: Int?
-    let age: Int?
-    let credits: [TMDBMediaCredit]
-
-    var id: String {
-        year.map(String.init) ?? "unknown"
-    }
-
-    var title: String {
-        guard let year else { return "Unknown year" }
-        if let age {
-            return "\(year) · age \(age)"
-        }
-        return String(year)
-    }
-}
-
 @MainActor
 final class PersonDetailViewModel: ObservableObject {
     @Published var detail: TMDBPersonDetail?
@@ -354,7 +326,6 @@ final class PersonDetailViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published private(set) var knownFor: [TMDBMediaCredit] = []
     @Published private(set) var credits: [TMDBMediaCredit] = []
-    @Published private(set) var creditGroups: [CreditYearGroup] = []
 
     let personID: Int
 
@@ -393,7 +364,7 @@ final class PersonDetailViewModel: ObservableObject {
             self.detail = detailResponse
             let tvCreditsResponse = try? await tvCredits
             tvEpisodeCounts = Self.buildEpisodeCounts(from: tvCreditsResponse)
-            applyCredits(cast: creditsResponse.cast, crew: creditsResponse.crew, birthday: detailResponse.birthday)
+            applyCredits(cast: creditsResponse.cast, crew: creditsResponse.crew)
             hasLoaded = true
         } catch is CancellationError {
         } catch {
@@ -411,7 +382,11 @@ final class PersonDetailViewModel: ObservableObject {
         imageURL(path: path, sizes: imageConfig?.posterSizes, fallback: "w342")
     }
 
-    func creditSubtitle(_ credit: TMDBMediaCredit, includeYear: Bool = true) -> String {
+    func creditSubtitle(
+        _ credit: TMDBMediaCredit,
+        includeYear: Bool = true,
+        includeAge: Bool = false
+    ) -> String {
         var parts: [String] = []
         if let role = credit.character, !role.isEmpty {
             parts.append(role)
@@ -422,9 +397,20 @@ final class PersonDetailViewModel: ObservableObject {
             let suffix = episodeCount == 1 ? "episode" : "episodes"
             parts.append("\(episodeCount) \(suffix)")
         }
+        let appearanceDateValue = appearanceDateValue(for: credit)
         let appearanceYear = yearString(from: appearanceDate(for: credit))
-        if includeYear, let appearanceYear {
-            parts.append(appearanceYear)
+        if includeYear {
+            if includeAge,
+               let appearanceDateValue,
+               let age = age(at: appearanceDateValue, birthday: detail?.birthday) {
+                if let appearanceYear {
+                    parts.append("\(appearanceYear) · age \(age)")
+                } else {
+                    parts.append("age \(age)")
+                }
+            } else if let appearanceYear {
+                parts.append(appearanceYear)
+            }
         }
         if credit.mediaType == .tv {
             if let startYear = yearString(from: credit.firstAirDate),
@@ -435,13 +421,13 @@ final class PersonDetailViewModel: ObservableObject {
         return parts.joined(separator: " • ")
     }
 
-    private func applyCredits(cast: [TMDBMediaCredit], crew: [TMDBMediaCredit], birthday: String?) {
+    private func applyCredits(cast: [TMDBMediaCredit], crew: [TMDBMediaCredit]) {
         let castKeys = Set(cast.map { "\($0.mediaType.rawValue):\($0.id)" })
         let merged = cast + crew.filter { !castKeys.contains("\($0.mediaType.rawValue):\($0.id)") }
-        sortCredits(from: merged, birthday: birthday)
+        sortCredits(from: merged)
     }
 
-    private func sortCredits(from creditsSource: [TMDBMediaCredit], birthday: String?) {
+    private func sortCredits(from creditsSource: [TMDBMediaCredit]) {
         let sorted = creditsSource.sorted { (lhs, rhs) in
             let lhsIsSelf = isSelfRole(lhs)
             let rhsIsSelf = isSelfRole(rhs)
@@ -461,7 +447,6 @@ final class PersonDetailViewModel: ObservableObject {
             return lhs.displayTitle < rhs.displayTitle
         }
         credits = Array(sorted.prefix(40))
-        creditGroups = buildCreditGroups(from: credits, birthday: birthday)
         let knownForCandidates = sorted.filter { !isSelfRole($0) }
         let knownForSource = knownForCandidates.isEmpty ? sorted : knownForCandidates
         knownFor = Array(knownForSource.prefix(12))
@@ -481,46 +466,6 @@ final class PersonDetailViewModel: ObservableObject {
     private func appearanceDateValue(for credit: TMDBMediaCredit) -> Date? {
         guard let dateString = appearanceDate(for: credit) else { return nil }
         return TMDBDateFormatter.input.date(from: dateString)
-    }
-
-    private func buildCreditGroups(from credits: [TMDBMediaCredit], birthday: String?) -> [CreditYearGroup] {
-        var grouped: [Int: [TMDBMediaCredit]] = [:]
-        var undated: [TMDBMediaCredit] = []
-
-        for credit in credits {
-            guard let year = creditYear(for: credit) else {
-                undated.append(credit)
-                continue
-            }
-            grouped[year, default: []].append(credit)
-        }
-
-        var results: [CreditYearGroup] = []
-        for year in grouped.keys.sorted(by: >) {
-            let groupCredits = grouped[year] ?? []
-            let referenceDate = groupCredits.compactMap(appearanceDateValue).max() ?? endOfYear(year)
-            let age = age(at: referenceDate, birthday: birthday)
-            results.append(CreditYearGroup(year: year, age: age, credits: groupCredits))
-        }
-
-        if !undated.isEmpty {
-            results.append(CreditYearGroup(year: nil, age: nil, credits: undated))
-        }
-
-        return results
-    }
-
-    private func creditYear(for credit: TMDBMediaCredit) -> Int? {
-        guard let yearString = yearString(from: appearanceDate(for: credit)) else { return nil }
-        return Int(yearString)
-    }
-
-    private func endOfYear(_ year: Int) -> Date {
-        var components = DateComponents()
-        components.year = year
-        components.month = 12
-        components.day = 31
-        return Calendar.current.date(from: components) ?? Date()
     }
 
     private func age(at referenceDate: Date, birthday: String?) -> Int? {
