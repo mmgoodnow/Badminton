@@ -104,14 +104,11 @@ struct PersonDetailView: View {
             if let department = detail.knownForDepartment, !department.isEmpty {
                 infoStack(label: "Known for", value: department)
             }
-            if let bornValue = bornValue(for: detail) {
+            if let bornValue = bornValue(for: detail, place: detail.placeOfBirth) {
                 infoStack(label: "Born", value: bornValue)
             }
             if let diedValue = diedValue(for: detail) {
                 infoStack(label: "Died", value: diedValue)
-            }
-            if let place = detail.placeOfBirth, !place.isEmpty {
-                infoStack(label: "Place of birth", value: place)
             }
         }
     }
@@ -224,12 +221,16 @@ struct PersonDetailView: View {
         return "\(years) years old"
     }
 
-    private func bornValue(for detail: TMDBPersonDetail) -> String? {
+    private func bornValue(for detail: TMDBPersonDetail, place: String?) -> String? {
         guard let birthday = TMDBDateFormatter.format(detail.birthday) else { return nil }
+        var parts: [String] = [birthday]
         if detail.deathday == nil, let age = ageString(birthday: detail.birthday, reference: nil) {
-            return "\(birthday) · \(age)"
+            parts.append(age)
         }
-        return birthday
+        if let place, !place.isEmpty {
+            parts.append(place)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func diedValue(for detail: TMDBPersonDetail) -> String? {
