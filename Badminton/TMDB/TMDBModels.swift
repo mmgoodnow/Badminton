@@ -251,6 +251,16 @@ struct TMDBCombinedCredits: Decodable, Hashable {
     let crew: [TMDBMediaCredit]
 }
 
+struct TMDBPersonTVCredits: Decodable, Hashable {
+    let cast: [TMDBPersonTVCredit]
+    let crew: [TMDBPersonTVCredit]
+}
+
+struct TMDBPersonTVCredit: Decodable, Hashable {
+    let id: Int
+    let episodeCount: Int?
+}
+
 struct TMDBMediaCredit: Decodable, Identifiable, Hashable {
     let id: Int
     let mediaType: TMDBMediaType
