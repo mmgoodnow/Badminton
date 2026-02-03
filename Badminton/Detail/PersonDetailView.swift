@@ -128,7 +128,7 @@ struct PersonDetailView: View {
                         ForEach(viewModel.knownFor) { credit in
                             let card = CreditCardView(
                                 title: credit.displayTitle,
-                                subtitle: viewModel.creditSubtitle(credit, includeAge: false),
+                                subtitle: viewModel.creditSubtitle(credit, includeAge: false, lineBreaks: false),
                                 imageURL: viewModel.posterURL(path: credit.posterPath)
                             )
                             if credit.mediaType == .movie || credit.mediaType == .tv {
@@ -163,7 +163,12 @@ struct PersonDetailView: View {
                         let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
                         let row = CreditRowView(
                             title: credit.displayTitle,
-                            subtitle: viewModel.creditSubtitle(credit, includeYear: true, includeAge: true),
+                            subtitle: viewModel.creditSubtitle(
+                                credit,
+                                includeYear: true,
+                                includeAge: true,
+                                lineBreaks: true
+                            ),
                             imageURL: viewModel.posterURL(path: credit.posterPath),
                             showChevron: isTappable
                         )
@@ -385,7 +390,8 @@ final class PersonDetailViewModel: ObservableObject {
     func creditSubtitle(
         _ credit: TMDBMediaCredit,
         includeYear: Bool = true,
-        includeAge: Bool = false
+        includeAge: Bool = false,
+        lineBreaks: Bool = false
     ) -> String {
         var parts: [String] = []
         if let role = credit.character, !role.isEmpty {
@@ -418,7 +424,8 @@ final class PersonDetailViewModel: ObservableObject {
                 parts.append("started \(startYear)")
             }
         }
-        return parts.joined(separator: " • ")
+        let separator = lineBreaks ? "\n" : " • "
+        return parts.joined(separator: separator)
     }
 
     private func applyCredits(cast: [TMDBMediaCredit], crew: [TMDBMediaCredit]) {
