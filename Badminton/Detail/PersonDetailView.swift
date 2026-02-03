@@ -124,7 +124,7 @@ struct PersonDetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 16) {
                         ForEach(viewModel.knownFor) { credit in
                             let card = ListPosterCard(
                                 title: credit.displayTitle,
