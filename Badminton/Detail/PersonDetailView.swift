@@ -223,14 +223,14 @@ struct PersonDetailView: View {
 
     private func bornValue(for detail: TMDBPersonDetail, place: String?) -> String? {
         guard let birthday = TMDBDateFormatter.format(detail.birthday) else { return nil }
-        var parts: [String] = [birthday]
+        var line1 = birthday
         if detail.deathday == nil, let age = ageString(birthday: detail.birthday, reference: nil) {
-            parts.append(age)
+            line1 += " · \(age)"
         }
         if let place, !place.isEmpty {
-            parts.append(place)
+            return "\(line1)\n\(place)"
         }
-        return parts.joined(separator: " · ")
+        return line1
     }
 
     private func diedValue(for detail: TMDBPersonDetail) -> String? {
@@ -419,7 +419,7 @@ final class PersonDetailViewModel: ObservableObject {
             parts.append(job)
         }
         if credit.mediaType == .tv, let episodeCount = tvEpisodeCounts[credit.id], episodeCount > 0 {
-            let suffix = episodeCount == 1 ? "ep" : "eps"
+            let suffix = episodeCount == 1 ? "episode" : "episodes"
             parts.append("\(episodeCount) \(suffix)")
         }
         let appearanceYear = yearString(from: appearanceDate(for: credit))
