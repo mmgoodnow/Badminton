@@ -438,7 +438,11 @@ final class PersonDetailViewModel: ObservableObject {
     private func applyCredits(cast: [TMDBMediaCredit], crew: [TMDBMediaCredit], birthday: String?) {
         let castKeys = Set(cast.map { "\($0.mediaType.rawValue):\($0.id)" })
         let merged = cast + crew.filter { !castKeys.contains("\($0.mediaType.rawValue):\($0.id)") }
-        let sorted = merged.sorted { (lhs, rhs) in
+        sortCredits(from: merged, birthday: birthday)
+    }
+
+    private func sortCredits(from creditsSource: [TMDBMediaCredit], birthday: String?) {
+        let sorted = creditsSource.sorted { (lhs, rhs) in
             let lhsIsSelf = isSelfRole(lhs)
             let rhsIsSelf = isSelfRole(rhs)
             if lhsIsSelf != rhsIsSelf {
