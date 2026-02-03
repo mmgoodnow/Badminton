@@ -33,7 +33,6 @@ struct PersonDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if let detail = viewModel.detail {
                     biographySection(detail: detail)
-                    infoSection(detail: detail)
                     knownForSection
                     creditsSection
                 }
@@ -82,6 +81,9 @@ struct PersonDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.name ?? nameFallback ?? "")
                     .font(.title.bold())
+                if let detail = viewModel.detail {
+                    headerInfo(detail: detail)
+                }
             }
             Spacer(minLength: 0)
         }
@@ -97,24 +99,19 @@ struct PersonDetailView: View {
         }
     }
 
-    private func infoSection(detail: TMDBPersonDetail) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Info")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 10) {
-                if let department = detail.knownForDepartment, !department.isEmpty {
-                    infoStack(label: "Known for", value: department)
-                }
-                if let bornValue = bornValue(for: detail) {
-                    infoStack(label: "Born", value: bornValue)
-                }
-                if let diedValue = diedValue(for: detail) {
-                    infoStack(label: "Died", value: diedValue)
-                }
-                if let place = detail.placeOfBirth, !place.isEmpty {
-                    infoStack(label: "Place of birth", value: place)
-                }
+    private func headerInfo(detail: TMDBPersonDetail) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let department = detail.knownForDepartment, !department.isEmpty {
+                infoStack(label: "Known for", value: department)
+            }
+            if let bornValue = bornValue(for: detail) {
+                infoStack(label: "Born", value: bornValue)
+            }
+            if let diedValue = diedValue(for: detail) {
+                infoStack(label: "Died", value: diedValue)
+            }
+            if let place = detail.placeOfBirth, !place.isEmpty {
+                infoStack(label: "Place of birth", value: place)
             }
         }
     }
