@@ -1,5 +1,4 @@
 import Combine
-import Kingfisher
 import os
 import SwiftUI
 
@@ -264,7 +263,7 @@ struct HomeView: View {
                         Button {
                             handlePlexSelection(item)
                         } label: {
-                            PosterCardView(
+                            ListPosterCard(
                                 title: item.title,
                                 subtitle: item.subtitle,
                                 imageURL: item.imageURL
@@ -334,7 +333,7 @@ struct HomeView: View {
                                 )
                             }
                         } label: {
-                            PosterCardView(
+                            ListPosterCard(
                                 title: item.displayTitle,
                                 subtitle: item.subtitle,
                                 imageURL: viewModel.posterURL(path: item.posterPath)
@@ -358,21 +357,23 @@ struct HomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(items) { person in
-                        Button {
-                            navigationPath.append(
-                                TMDBNavigationRoute.person(
-                                    id: person.id,
-                                    name: person.name,
-                                    profilePath: person.profilePath
+                            Button {
+                                navigationPath.append(
+                                    TMDBNavigationRoute.person(
+                                        id: person.id,
+                                        name: person.name,
+                                        profilePath: person.profilePath
+                                    )
                                 )
-                            )
-                        } label: {
-                            PersonCardView(
-                                name: person.name,
-                                subtitle: person.knownForDepartment ?? "",
-                                imageURL: viewModel.profileURL(path: person.profilePath)
-                            )
-                        }
+                            } label: {
+                                ListPosterCard(
+                                    title: person.name,
+                                    subtitle: person.knownForDepartment ?? "",
+                                    imageURL: viewModel.profileURL(path: person.profilePath),
+                                    posterSize: CGSize(width: 140, height: 200),
+                                    posterCornerRadius: 16
+                                )
+                            }
                             .buttonStyle(.plain)
                         }
                     }
@@ -665,91 +666,25 @@ private struct PlexResolveOverlay: View {
 }
 
 private struct PlexPosterSkeleton: View {
+    @Environment(\.listItemStyle) private var style
+
     var body: some View {
+        let posterSize = style.cardPosterSize
         VStack(alignment: .leading, spacing: 8) {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.2))
-                .frame(width: 140, height: 210)
+                .frame(width: posterSize.width, height: posterSize.height)
 
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color.gray.opacity(0.2))
-                .frame(width: 120, height: 14)
+                .frame(width: posterSize.width * 0.85, height: 14)
 
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color.gray.opacity(0.2))
-                .frame(width: 90, height: 12)
+                .frame(width: posterSize.width * 0.65, height: 12)
         }
         .redacted(reason: .placeholder)
-        .frame(width: 140, alignment: .leading)
-    }
-}
-
-private struct PosterCardView: View {
-    let title: String
-    let subtitle: String
-    let imageURL: URL?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
-
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 140, height: 210)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            Text(title)
-                .font(.body.weight(.semibold))
-                .lineLimit(2)
-
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 140, alignment: .leading)
-        .contentShape(Rectangle())
-    }
-}
-
-private struct PersonCardView: View {
-    let name: String
-    let subtitle: String
-    let imageURL: URL?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.gray.opacity(0.2))
-
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 140, height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-
-            Text(name)
-                .font(.body.weight(.semibold))
-                .lineLimit(2)
-
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 140, alignment: .leading)
+        .frame(width: posterSize.width, alignment: .leading)
     }
 }
 

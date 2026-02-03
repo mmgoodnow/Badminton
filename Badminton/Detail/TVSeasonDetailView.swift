@@ -160,38 +160,17 @@ private struct EpisodeRow: View {
     let imageURL: URL?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 90, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("E\(episode.episodeNumber) · \(episode.name)")
-                    .font(.subheadline.weight(.semibold))
-                if let overview = episode.overview, !overview.isEmpty {
-                    Text(overview)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                if let airDate = TMDBDateFormatter.format(episode.airDate) {
-                    Text(airDate)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
+        ListItemRow(
+            title: "E\(episode.episodeNumber) · \(episode.name)",
+            subtitleLines: [
+                episode.overview ?? "",
+                TMDBDateFormatter.format(episode.airDate) ?? ""
+            ],
+            imageURL: imageURL,
+            posterSize: CGSize(width: 90, height: 54),
+            posterCornerRadius: 8,
+            subtitleLineLimit: 2
+        )
     }
 }
 

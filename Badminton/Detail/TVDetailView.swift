@@ -389,32 +389,11 @@ private struct CastRow: View {
     let imageURL: URL?
 
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 96, height: 144)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(member.name)
-                    .font(.subheadline.weight(.semibold))
-                if let character = member.character, !character.isEmpty {
-                    Text(character)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
+        ListItemRow(
+            title: member.name,
+            subtitle: member.character ?? "",
+            imageURL: imageURL
+        )
     }
 }
 
@@ -423,41 +402,16 @@ private struct SeasonRow: View {
     let imageURL: URL?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 96, height: 144)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(season.name)
-                    .font(.subheadline.weight(.semibold))
-                if let airDate = TMDBDateFormatter.format(season.airDate) {
-                    Text(airDate)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text("\(season.episodeCount) episodes")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let overview = season.overview, !overview.isEmpty {
-                    Text(overview)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
+        ListItemRow(
+            title: season.name,
+            subtitleLines: [
+                TMDBDateFormatter.format(season.airDate) ?? "",
+                "\(season.episodeCount) episodes",
+                season.overview ?? ""
+            ],
+            imageURL: imageURL,
+            subtitleLineLimit: 2
+        )
     }
 }
 

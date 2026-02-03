@@ -1,4 +1,3 @@
-import Kingfisher
 import SwiftUI
 
 struct SearchResultRow: View {
@@ -6,7 +5,11 @@ struct SearchResultRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            PosterThumb(url: posterURL)
+            ListPoster(
+                url: posterURL,
+                size: CGSize(width: 90, height: 135),
+                cornerRadius: 8
+            )
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
@@ -29,9 +32,11 @@ struct SearchResultRow: View {
                         .lineLimit(3)
                 }
 
-                Text(item.subtitleText)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                if !item.subtitleText.isEmpty {
+                    Text(item.subtitleText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -47,24 +52,6 @@ struct SearchResultRow: View {
             return SearchViewModel.posterURL(path: poster, size: "w185")
         }
         return nil
-    }
-}
-
-private struct PosterThumb: View {
-    let url: URL?
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.2))
-            if let url {
-                KFImage(url)
-                    .resizable()
-                    .scaledToFill()
-            }
-        }
-        .frame(width: 90, height: 135)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

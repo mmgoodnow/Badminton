@@ -126,7 +126,7 @@ struct PersonDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(viewModel.knownFor) { credit in
-                            let card = CreditCardView(
+                            let card = ListPosterCard(
                                 title: credit.displayTitle,
                                 subtitle: viewModel.creditSubtitle(credit, includeAge: false, lineBreaks: false),
                                 imageURL: viewModel.posterURL(path: credit.posterPath)
@@ -161,7 +161,7 @@ struct PersonDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(viewModel.credits) { credit in
                         let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
-                        let row = CreditRowView(
+                        let row = ListItemRow(
                             title: credit.displayTitle,
                             subtitle: viewModel.creditSubtitle(
                                 credit,
@@ -248,84 +248,6 @@ struct PersonDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
         }
-    }
-}
-
-private struct CreditCardView: View {
-    let title: String
-    let subtitle: String
-    let imageURL: URL?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.2))
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 140, height: 210)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
-            if !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: 140, alignment: .leading)
-    }
-}
-
-private struct CreditRowView: View {
-    let title: String
-    let subtitle: String
-    let imageURL: URL?
-    let showChevron: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.2))
-                if let imageURL {
-                    KFImage(imageURL)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: 70, height: 105)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 0)
-            if showChevron {
-                VStack {
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                    Spacer(minLength: 0)
-                }
-                .frame(maxHeight: .infinity)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
     }
 }
 
