@@ -93,3 +93,19 @@ struct OverseerrRequestBody: Encodable {
 struct OverseerrRequestResponse: Decodable {
     let id: Int?
 }
+
+struct OverseerrPageInfo: Decodable {
+    let pages: Int
+    let page: Int
+    let results: Int
+    let pageSize: Int
+}
+
+struct OverseerrMediaItem: Decodable {
+    let tmdbId: Int
+}
+
+struct OverseerrMediaPage: Decodable {
+    let pageInfo: OverseerrPageInfo
+    let results: [OverseerrMediaItem]
+}

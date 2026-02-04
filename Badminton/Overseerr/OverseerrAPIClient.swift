@@ -43,8 +43,38 @@ struct OverseerrAPIClient {
         try await post(baseURL: baseURL, path: "/request", body: body, cookie: cookie)
     }
 
-    func get<T: Decodable>(baseURL: URL, path: String, cookie: String? = nil) async throws -> T {
-        let url = try makeURL(baseURL: baseURL, path: path)
+    func getMediaPage(
+        baseURL: URL,
+        filter: String,
+        take: Int,
+        skip: Int,
+        cookie: String?
+    ) async throws -> OverseerrMediaPage {
+        let queryItems = [
+            URLQueryItem(name: "filter", value: filter),
+            URLQueryItem(name: "take", value: String(take)),
+            URLQueryItem(name: "skip", value: String(skip))
+        ]
+        return try await get(baseURL: baseURL, path: "/media", queryItems: queryItems, cookie: cookie)
+    }
+
+    func get<T: Decodable>(
+        baseURL: URL,
+        path: String,
+        queryItems: [URLQueryItem] = [],
+        cookie: String? = nil
+    ) async throws -> T {
+        var url = try makeURL(baseURL: baseURL, path: path)
+        if !queryItems.isEmpty {
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                throw OverseerrAPIError.invalidURL
+            }
+            components.queryItems = queryItems
+            guard let withQuery = components.url else {
+                throw OverseerrAPIError.invalidURL
+            }
+            url = withQuery
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
