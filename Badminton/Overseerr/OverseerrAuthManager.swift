@@ -3,12 +3,6 @@ import Foundation
 
 @MainActor
 final class OverseerrAuthManager: ObservableObject {
-    @Published var siteName: String {
-        didSet {
-            let trimmed = siteName.trimmingCharacters(in: .whitespacesAndNewlines)
-            storage.save(trimmed, for: .siteName)
-        }
-    }
     @Published var baseURLString: String {
         didSet {
             let trimmed = baseURLString.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -33,7 +27,6 @@ final class OverseerrAuthManager: ObservableObject {
         self.client = client
         let storedBaseURL = storage.read(.baseURL) ?? ""
         self.baseURLString = storedBaseURL
-        self.siteName = storage.read(.siteName) ?? ""
         self.sessionCookie = storage.read(.sessionCookie)
         self.userDisplayName = storage.read(.userDisplayName)
         self.isAuthenticated = sessionCookie != nil
@@ -88,7 +81,6 @@ final class OverseerrAuthManager: ObservableObject {
 private struct OverseerrTokenStore {
     enum Key: String {
         case baseURL = "overseerr.base.url"
-        case siteName = "overseerr.site.name"
         case sessionCookie = "overseerr.session.cookie"
         case userDisplayName = "overseerr.user.name"
     }

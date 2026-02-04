@@ -145,12 +145,6 @@ struct SettingsView: View {
         ) {
             settingsSubcard(title: "Server") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Site name")
-                        .font(.callout.weight(.semibold))
-                    TextField("Overseerr", text: $overseerrAuthManager.siteName)
-                        .textFieldStyle(.roundedBorder)
-                    Text("Domain")
-                        .font(.callout.weight(.semibold))
                     TextField("https://overseerr.yourdomain.com", text: $overseerrAuthManager.baseURLString)
                         .textFieldStyle(.roundedBorder)
 #if os(iOS)
