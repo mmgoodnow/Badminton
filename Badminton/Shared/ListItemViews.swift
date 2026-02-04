@@ -58,7 +58,7 @@ struct ListPoster: View {
         cornerRadius: CGFloat? = nil,
         showDogEar: Bool = false,
         dogEarColor: Color = .yellow,
-        dogEarSize: CGFloat = 18
+        dogEarSize: CGFloat = 22
     ) {
         self.url = url
         self.size = size
@@ -236,7 +236,7 @@ struct ListPosterCard: View {
         imageURL: URL?,
         showDogEar: Bool = false,
         dogEarColor: Color = .yellow,
-        dogEarSize: CGFloat = 18,
+        dogEarSize: CGFloat = 22,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
