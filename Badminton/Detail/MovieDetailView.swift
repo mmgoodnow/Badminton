@@ -8,15 +8,18 @@ struct MovieDetailView: View {
     let posterPathFallback: String?
 
     @StateObject private var viewModel: MovieDetailViewModel
+    @StateObject private var overseerrRequest: OverseerrRequestViewModel
     @State private var lightboxItem: ImageLightboxItem?
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
+    @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
         self.movieID = movieID
         self.titleFallback = title
         self.posterPathFallback = posterPath
         _viewModel = StateObject(wrappedValue: MovieDetailViewModel(movieID: movieID))
+        _overseerrRequest = StateObject(wrappedValue: OverseerrRequestViewModel(mediaType: .movie, tmdbID: movieID))
     }
 
     var body: some View {
@@ -50,15 +53,24 @@ struct MovieDetailView: View {
         .macOSSwipeToDismiss()
         .task {
             await viewModel.load()
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
         .refreshable {
             await viewModel.load(force: true)
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
 #if os(macOS) || targetEnvironment(macCatalyst)
         .focusedSceneValue(\.badmintonRefreshAction) {
             await viewModel.load(force: true)
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
 #endif
+        .task(id: overseerrAuthManager.isAuthenticated) {
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+        }
+        .task(id: overseerrAuthManager.baseURLString) {
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+        }
     }
 
     private var header: some View {
@@ -74,6 +86,7 @@ struct MovieDetailView: View {
                 }
                 if let detail = viewModel.detail {
                     quickFacts(detail: detail)
+                    overseerrControls
                     genreChips
                 }
             }
@@ -168,6 +181,34 @@ struct MovieDetailView: View {
             infoStack(label: "Score", value: scoreText(from: detail.voteAverage))
             if let status = detail.status, !status.isEmpty {
                 infoStack(label: "Status", value: status)
+            }
+        }
+    }
+
+    private var overseerrControls: some View {
+        Group {
+            if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
+                HStack(alignment: .firstTextBaseline) {
+                    infoStack(label: "Overseerr", value: overseerrRequest.statusText)
+                    Spacer(minLength: 12)
+                    if overseerrRequest.canRequest {
+                        Button("Request") {
+                            Task {
+                                await overseerrRequest.request(
+                                    baseURL: overseerrAuthManager.baseURL,
+                                    cookie: overseerrAuthManager.authCookie()
+                                )
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(overseerrRequest.isLoading)
+                    }
+                }
+                if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
             }
         }
     }
@@ -398,4 +439,5 @@ final class MovieDetailViewModel: ObservableObject {
     NavigationStack {
         MovieDetailView(movieID: 550, title: "Fight Club")
     }
+    .environmentObject(OverseerrAuthManager())
 }

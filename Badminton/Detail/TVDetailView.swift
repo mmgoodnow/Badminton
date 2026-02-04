@@ -9,15 +9,20 @@ struct TVDetailView: View {
     let posterPathFallback: String?
 
     @StateObject private var viewModel: TVDetailViewModel
+    @StateObject private var overseerrRequest: OverseerrRequestViewModel
     @State private var lightboxItem: ImageLightboxItem?
+    @State private var isShowingOverseerrRequest = false
+    @State private var selectedSeasons: Set<Int> = []
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
+    @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
         self.titleFallback = title
         self.posterPathFallback = posterPath
         _viewModel = StateObject(wrappedValue: TVDetailViewModel(tvID: tvID))
+        _overseerrRequest = StateObject(wrappedValue: OverseerrRequestViewModel(mediaType: .tv, tmdbID: tvID))
     }
 
     var body: some View {
@@ -57,15 +62,24 @@ struct TVDetailView: View {
         }
         .task {
             await viewModel.load()
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
         .refreshable {
             await viewModel.load(force: true)
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
 #if os(macOS) || targetEnvironment(macCatalyst)
         .focusedSceneValue(\.badmintonRefreshAction) {
             await viewModel.load(force: true)
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
         }
 #endif
+        .task(id: overseerrAuthManager.isAuthenticated) {
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+        }
+        .task(id: overseerrAuthManager.baseURLString) {
+            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+        }
     }
 
     private var header: some View {
@@ -81,6 +95,7 @@ struct TVDetailView: View {
                 }
                 if let detail = viewModel.detail {
                     quickFacts(detail: detail)
+                    overseerrControls(detail: detail)
                     genreChips
                 }
             }
@@ -165,6 +180,33 @@ struct TVDetailView: View {
         }
     }
 
+    private func overseerrControls(detail: TMDBTVSeriesDetail) -> some View {
+        Group {
+            if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
+                HStack(alignment: .firstTextBaseline) {
+                    infoStack(label: "Overseerr", value: overseerrRequest.statusText)
+                    Spacer(minLength: 12)
+                    if overseerrRequest.canRequest {
+                        Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
+                            prepareSeasonSelection(from: detail.seasons)
+                            isShowingOverseerrRequest = true
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(overseerrRequest.isLoading)
+                    }
+                }
+                if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingOverseerrRequest) {
+            overseerrRequestSheet(detail: detail)
+        }
+    }
+
     private func seasonsSection(detail: TMDBTVSeriesDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Seasons")
@@ -227,6 +269,89 @@ struct TVDetailView: View {
                 #endif
             }
         }
+    }
+
+    private func overseerrRequestSheet(detail: TMDBTVSeriesDetail) -> some View {
+        let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+        return NavigationStack {
+            List {
+                Section {
+                    if overseerrRequest.partialRequestsEnabled {
+                        ForEach(seasons, id: \.id) { season in
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(season.name)
+                                        .font(.body.weight(.semibold))
+                                    Text("Season \(season.seasonNumber)")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if let status = overseerrRequest.seasonStatusText(for: season.seasonNumber) {
+                                    Text(status)
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Toggle("", isOn: Binding(
+                                    get: { selectedSeasons.contains(season.seasonNumber) },
+                                    set: { isOn in
+                                        if isOn {
+                                            selectedSeasons.insert(season.seasonNumber)
+                                        } else {
+                                            selectedSeasons.remove(season.seasonNumber)
+                                        }
+                                    }
+                                ))
+                                .labelsHidden()
+                            }
+                        }
+                    } else {
+                        Text("Overseerr is configured for full-series requests.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Request")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isShowingOverseerrRequest = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Request") {
+                        Task {
+                            let seasonsToRequest = overseerrRequest.partialRequestsEnabled
+                                ? Array(selectedSeasons).sorted()
+                                : nil
+                            await overseerrRequest.request(
+                                seasons: seasonsToRequest,
+                                baseURL: overseerrAuthManager.baseURL,
+                                cookie: overseerrAuthManager.authCookie()
+                            )
+                            isShowingOverseerrRequest = false
+                        }
+                    }
+                    .disabled(overseerrRequest.isLoading || (overseerrRequest.partialRequestsEnabled && selectedSeasons.isEmpty))
+                }
+            }
+        }
+    }
+
+    private func prepareSeasonSelection(from seasons: [TMDBTVSeason]) {
+        guard selectedSeasons.isEmpty else { return }
+        let available = seasons
+            .map { $0.seasonNumber }
+            .filter { overseerrRequest.seasonStatuses[$0] == .available }
+        if available.count == seasons.count {
+            selectedSeasons = []
+            return
+        }
+        let defaultSelection = seasons
+            .map { $0.seasonNumber }
+            .filter { overseerrRequest.seasonStatuses[$0] != .available }
+        selectedSeasons = Set(defaultSelection)
     }
 
     private var trailersSection: some View {
@@ -794,4 +919,5 @@ private struct FlowLayout: Layout {
     NavigationStack {
         TVDetailView(tvID: 1399, title: "Game of Thrones")
     }
+    .environmentObject(OverseerrAuthManager())
 }
