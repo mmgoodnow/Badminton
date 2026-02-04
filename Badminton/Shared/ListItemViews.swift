@@ -46,20 +46,42 @@ struct ListPoster: View {
     let url: URL?
     let size: CGSize?
     let cornerRadius: CGFloat?
+    let showDogEar: Bool
+    let dogEarColor: Color
+    let dogEarSize: CGFloat
 
     @Environment(\.listItemStyle) private var style
+
+    init(
+        url: URL?,
+        size: CGSize? = nil,
+        cornerRadius: CGFloat? = nil,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 18
+    ) {
+        self.url = url
+        self.size = size
+        self.cornerRadius = cornerRadius
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
+    }
 
     var body: some View {
         let resolvedSize = size ?? style.rowPosterSize
         let resolvedCornerRadius = cornerRadius ?? style.rowPosterCornerRadius
 
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: resolvedCornerRadius)
                 .fill(Color.gray.opacity(0.2))
             if let url {
                 KFImage(url)
                     .resizable()
                     .scaledToFill()
+            }
+            if showDogEar {
+                PosterDogEar(size: dogEarSize, color: dogEarColor)
             }
         }
         .frame(width: resolvedSize.width, height: resolvedSize.height)
@@ -197,6 +219,9 @@ struct ListPosterCard: View {
     let title: String
     let subtitle: String
     let imageURL: URL?
+    let showDogEar: Bool
+    let dogEarColor: Color
+    let dogEarSize: CGFloat
     let posterSize: CGSize?
     let posterCornerRadius: CGFloat?
     let titleFont: Font?
@@ -209,6 +234,9 @@ struct ListPosterCard: View {
         title: String,
         subtitle: String = "",
         imageURL: URL?,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 18,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
@@ -218,6 +246,9 @@ struct ListPosterCard: View {
         self.title = title
         self.subtitle = subtitle
         self.imageURL = imageURL
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
         self.posterSize = posterSize
         self.posterCornerRadius = posterCornerRadius
         self.titleFont = titleFont
@@ -232,7 +263,14 @@ struct ListPosterCard: View {
         let resolvedPosterSize = posterSize ?? style.cardPosterSize
 
         VStack(alignment: .leading, spacing: 8) {
-            ListPoster(url: imageURL, size: resolvedPosterSize, cornerRadius: posterCornerRadius ?? style.cardPosterCornerRadius)
+            ListPoster(
+                url: imageURL,
+                size: resolvedPosterSize,
+                cornerRadius: posterCornerRadius ?? style.cardPosterCornerRadius,
+                showDogEar: showDogEar,
+                dogEarColor: dogEarColor,
+                dogEarSize: dogEarSize
+            )
             Text(title)
                 .font(resolvedTitleFont)
                 .lineLimit(2)
@@ -331,5 +369,22 @@ struct ListPosterGridItem: View {
         }
         .frame(width: resolvedPosterSize.width, alignment: .leading)
         .contentShape(Rectangle())
+    }
+}
+
+private struct PosterDogEar: View {
+    let size: CGFloat
+    let color: Color
+
+    var body: some View {
+        Path { path in
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: size, y: 0))
+            path.addLine(to: CGPoint(x: 0, y: size))
+            path.closeSubpath()
+        }
+        .fill(color)
+        .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+        .frame(width: size, height: size)
     }
 }

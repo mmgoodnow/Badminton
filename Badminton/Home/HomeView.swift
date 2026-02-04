@@ -360,17 +360,12 @@ struct HomeView: View {
                                 )
                             }
                         } label: {
-                            ZStack(alignment: .topLeading) {
-                                ListPosterCard(
-                                    title: item.displayTitle,
-                                    subtitle: item.subtitle,
-                                    imageURL: viewModel.posterURL(path: item.posterPath)
-                                )
-                                if overseerrLibraryIndex.isAvailable(tmdbID: item.id) {
-                                    PosterDogEar()
-                                        .offset(x: 6, y: 6)
-                                }
-                            }
+                            ListPosterCard(
+                                title: item.displayTitle,
+                                subtitle: item.subtitle,
+                                imageURL: viewModel.posterURL(path: item.posterPath),
+                                showDogEar: overseerrLibraryIndex.isAvailable(tmdbID: item.id)
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -718,22 +713,6 @@ private struct PlexPosterSkeleton: View {
         }
         .redacted(reason: .placeholder)
         .frame(width: posterSize.width, alignment: .leading)
-    }
-}
-
-private struct PosterDogEar: View {
-    var size: CGFloat = 16
-
-    var body: some View {
-        Path { path in
-            path.move(to: .zero)
-            path.addLine(to: CGPoint(x: size, y: 0))
-            path.addLine(to: CGPoint(x: 0, y: size))
-            path.closeSubpath()
-        }
-        .fill(Color.yellow)
-        .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0, y: 1)
-        .frame(width: size, height: size)
     }
 }
 
