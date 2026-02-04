@@ -184,7 +184,7 @@ struct TVDetailView: View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
                 HStack(alignment: .firstTextBaseline) {
-                    infoStack(label: "Overseerr", value: overseerrRequest.statusText)
+                    infoStack(label: "Plex", value: overseerrRequest.statusText)
                     Spacer(minLength: 12)
                     if overseerrRequest.canRequest {
                         Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
@@ -306,7 +306,7 @@ struct TVDetailView: View {
                             }
                         }
                     } else {
-                        Text("Overseerr is configured for full-series requests.")
+                        Text("Plex is configured for full-series requests.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

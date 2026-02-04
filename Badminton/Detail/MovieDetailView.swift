@@ -189,7 +189,7 @@ struct MovieDetailView: View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
                 HStack(alignment: .firstTextBaseline) {
-                    infoStack(label: "Overseerr", value: overseerrRequest.statusText)
+                    infoStack(label: "Plex", value: overseerrRequest.statusText)
                     Spacer(minLength: 12)
                     if overseerrRequest.canRequest {
                         Button("Request") {
