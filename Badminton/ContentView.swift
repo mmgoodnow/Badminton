@@ -8,6 +8,7 @@ struct ContentView: View {
             backgroundView
             HomeView()
         }
+        .dynamicTypeSize(.large)
     }
 
     private var backgroundView: some View {
