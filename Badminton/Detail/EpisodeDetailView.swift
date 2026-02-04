@@ -11,6 +11,7 @@ struct EpisodeDetailView: View {
 
     @StateObject private var viewModel: EpisodeDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
+    @Environment(\.listItemStyle) private var listItemStyle
 
     init(tvID: Int,
          seasonNumber: Int,
@@ -203,6 +204,41 @@ struct EpisodeDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(members) { member in
+                    if let cast = member as? TMDBCastMember {
+                        NavigationLink {
+                            PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
+                        } label: {
+                            ListPosterGridItem(
+                                title: cast.name,
+                                subtitle: cast.character ?? "",
+                                imageURL: viewModel.profileURL(path: cast.profilePath)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else if let crew = member as? TMDBCrewMember {
+                        NavigationLink {
+                            PersonDetailView(personID: crew.id, name: crew.name, profilePath: crew.profilePath)
+                        } label: {
+                            ListPosterGridItem(
+                                title: crew.name,
+                                subtitle: crew.job ?? "",
+                                imageURL: viewModel.profileURL(path: crew.profilePath)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        row(member)
+                    }
+                }
+            }
+            #else
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(members) { member in
                     if let cast = member as? TMDBCastMember {
@@ -224,6 +260,7 @@ struct EpisodeDetailView: View {
                     }
                 }
             }
+            #endif
         }
     }
 
@@ -239,6 +276,10 @@ struct EpisodeDetailView: View {
 
     private func scoreText(from score: Double) -> String {
         "\(Int((score * 10).rounded()))%"
+    }
+
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
     }
 
     private func showLightbox(url: URL, title: String) {

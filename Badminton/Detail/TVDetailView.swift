@@ -11,6 +11,7 @@ struct TVDetailView: View {
     @StateObject private var viewModel: TVDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
     @Environment(\.openURL) private var openURL
+    @Environment(\.listItemStyle) private var listItemStyle
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
@@ -175,6 +176,36 @@ struct TVDetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                #if os(macOS)
+                LazyVGrid(
+                    columns: gridColumns,
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    ForEach(seasons, id: \.id) { season in
+                        NavigationLink {
+                            TVSeasonDetailView(
+                                tvID: tvID,
+                                seasonNumber: season.seasonNumber,
+                                seasonName: season.name,
+                                posterPath: season.posterPath
+                            )
+                        } label: {
+                            ListPosterGridItem(
+                                title: season.name,
+                                subtitleLines: [
+                                    TMDBDateFormatter.format(season.airDate) ?? "",
+                                    "\(season.episodeCount) episodes",
+                                    season.overview ?? ""
+                                ],
+                                imageURL: viewModel.posterURL(path: season.posterPath),
+                                subtitleLineLimit: 2
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                #else
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(seasons, id: \.id) { season in
                         NavigationLink {
@@ -193,6 +224,7 @@ struct TVDetailView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                #endif
             }
         }
     }
@@ -362,6 +394,26 @@ struct TVDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.character ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #else
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(members) { member in
                     NavigationLink {
@@ -377,6 +429,7 @@ struct TVDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+            #endif
         }
     }
 
@@ -384,6 +437,26 @@ struct TVDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.job ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #else
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(members) { member in
                     NavigationLink {
@@ -399,7 +472,12 @@ struct TVDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+            #endif
         }
+    }
+
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
     }
 
     private func infoStack(label: String, value: String) -> some View {

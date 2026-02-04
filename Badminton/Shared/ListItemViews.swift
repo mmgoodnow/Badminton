@@ -246,3 +246,90 @@ struct ListPosterCard: View {
         .contentShape(Rectangle())
     }
 }
+
+struct ListPosterGridItem: View {
+    let title: String
+    let subtitleLines: [String]
+    let imageURL: URL?
+    let posterSize: CGSize?
+    let posterCornerRadius: CGFloat?
+    let titleFont: Font?
+    let subtitleFont: Font?
+    let subtitleColor: Color?
+    let titleLineLimit: Int?
+    let subtitleLineLimit: Int?
+
+    @Environment(\.listItemStyle) private var style
+
+    init(
+        title: String,
+        subtitle: String = "",
+        imageURL: URL?,
+        posterSize: CGSize? = nil,
+        posterCornerRadius: CGFloat? = nil,
+        titleFont: Font? = nil,
+        subtitleFont: Font? = nil,
+        subtitleColor: Color? = nil,
+        titleLineLimit: Int? = 2,
+        subtitleLineLimit: Int? = 2
+    ) {
+        self.title = title
+        self.subtitleLines = subtitle.split(whereSeparator: \.isNewline).map { String($0) }
+        self.imageURL = imageURL
+        self.posterSize = posterSize
+        self.posterCornerRadius = posterCornerRadius
+        self.titleFont = titleFont
+        self.subtitleFont = subtitleFont
+        self.subtitleColor = subtitleColor
+        self.titleLineLimit = titleLineLimit
+        self.subtitleLineLimit = subtitleLineLimit
+    }
+
+    init(
+        title: String,
+        subtitleLines: [String],
+        imageURL: URL?,
+        posterSize: CGSize? = nil,
+        posterCornerRadius: CGFloat? = nil,
+        titleFont: Font? = nil,
+        subtitleFont: Font? = nil,
+        subtitleColor: Color? = nil,
+        titleLineLimit: Int? = 2,
+        subtitleLineLimit: Int? = 2
+    ) {
+        self.title = title
+        self.subtitleLines = subtitleLines
+        self.imageURL = imageURL
+        self.posterSize = posterSize
+        self.posterCornerRadius = posterCornerRadius
+        self.titleFont = titleFont
+        self.subtitleFont = subtitleFont
+        self.subtitleColor = subtitleColor
+        self.titleLineLimit = titleLineLimit
+        self.subtitleLineLimit = subtitleLineLimit
+    }
+
+    var body: some View {
+        let resolvedPosterSize = posterSize ?? style.rowPosterSize
+        let resolvedCornerRadius = posterCornerRadius ?? style.rowPosterCornerRadius
+
+        VStack(alignment: .leading, spacing: 8) {
+            ListPoster(
+                url: imageURL,
+                size: resolvedPosterSize,
+                cornerRadius: resolvedCornerRadius
+            )
+            ListItemTextStack(
+                title: title,
+                subtitleLines: subtitleLines,
+                titleFont: titleFont,
+                subtitleFont: subtitleFont,
+                subtitleColor: subtitleColor,
+                titleLineLimit: titleLineLimit,
+                subtitleLineLimit: subtitleLineLimit
+            )
+        }
+        .frame(width: resolvedPosterSize.width, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+}

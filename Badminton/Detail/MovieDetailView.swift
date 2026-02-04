@@ -10,6 +10,7 @@ struct MovieDetailView: View {
     @StateObject private var viewModel: MovieDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
     @Environment(\.openURL) private var openURL
+    @Environment(\.listItemStyle) private var listItemStyle
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
         self.movieID = movieID
@@ -193,6 +194,26 @@ struct MovieDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.character ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #else
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(members) { member in
                     NavigationLink {
@@ -208,6 +229,7 @@ struct MovieDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+            #endif
         }
     }
 
@@ -215,6 +237,26 @@ struct MovieDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.job ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #else
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(members) { member in
                     NavigationLink {
@@ -230,7 +272,12 @@ struct MovieDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+            #endif
         }
+    }
+
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
     }
 
     private func infoStack(label: String, value: String) -> some View {
