@@ -16,6 +16,7 @@ struct TVDetailView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
+    @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
 
     init(tvID: Int, title: String? = nil, posterPath: String? = nil) {
         self.tvID = tvID
@@ -62,23 +63,23 @@ struct TVDetailView: View {
         }
         .task {
             await viewModel.load()
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
         .refreshable {
             await viewModel.load(force: true)
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
 #if os(macOS) || targetEnvironment(macCatalyst)
         .focusedSceneValue(\.badmintonRefreshAction) {
             await viewModel.load(force: true)
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
 #endif
         .task(id: overseerrAuthManager.isAuthenticated) {
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
         .task(id: overseerrAuthManager.baseURLString) {
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
     }
 
@@ -330,6 +331,10 @@ struct TVDetailView: View {
                                 baseURL: overseerrAuthManager.baseURL,
                                 cookie: overseerrAuthManager.authCookie()
                             )
+                            overseerrLibraryIndex.updateAvailability(
+                                tmdbID: tvID,
+                                status: overseerrRequest.mediaStatus
+                            )
                             isShowingOverseerrRequest = false
                         }
                     }
@@ -352,6 +357,17 @@ struct TVDetailView: View {
             .map { $0.seasonNumber }
             .filter { overseerrRequest.seasonStatuses[$0] != .available }
         selectedSeasons = Set(defaultSelection)
+    }
+
+    private func refreshOverseerr() async {
+        await overseerrRequest.load(
+            baseURL: overseerrAuthManager.baseURL,
+            cookie: overseerrAuthManager.authCookie()
+        )
+        overseerrLibraryIndex.updateAvailability(
+            tmdbID: tvID,
+            status: overseerrRequest.mediaStatus
+        )
     }
 
     private var trailersSection: some View {
@@ -920,4 +936,5 @@ private struct FlowLayout: Layout {
         TVDetailView(tvID: 1399, title: "Game of Thrones")
     }
     .environmentObject(OverseerrAuthManager())
+    .environmentObject(OverseerrLibraryIndex())
 }

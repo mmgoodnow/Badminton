@@ -6,6 +6,8 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @StateObject private var searchModel = SearchViewModel()
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
+    @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
+    @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingSettings = false
     @State private var navigationPath = NavigationPath()
@@ -120,6 +122,22 @@ struct HomeView: View {
             }
             .task {
                 await viewModel.load()
+                await overseerrLibraryIndex.refreshIfNeeded(
+                    baseURL: overseerrAuthManager.baseURL,
+                    cookie: overseerrAuthManager.authCookie()
+                )
+            }
+            .task(id: overseerrAuthManager.isAuthenticated) {
+                await overseerrLibraryIndex.refreshIfNeeded(
+                    baseURL: overseerrAuthManager.baseURL,
+                    cookie: overseerrAuthManager.authCookie()
+                )
+            }
+            .task(id: overseerrAuthManager.baseURLString) {
+                await overseerrLibraryIndex.refreshIfNeeded(
+                    baseURL: overseerrAuthManager.baseURL,
+                    cookie: overseerrAuthManager.authCookie()
+                )
             }
             .task(id: plexAuthManager.authToken) {
                 await viewModel.loadPlexHistory(
@@ -161,6 +179,10 @@ struct HomeView: View {
                         preferredServerID: plexAuthManager.preferredServerID,
                         preferredAccountIDs: plexAuthManager.preferredAccountIDs
                     )
+                    await overseerrLibraryIndex.refreshIfNeeded(
+                        baseURL: overseerrAuthManager.baseURL,
+                        cookie: overseerrAuthManager.authCookie()
+                    )
                 }
             }
             .sheet(isPresented: $showingSettings) {
@@ -190,6 +212,11 @@ struct HomeView: View {
             token: plexAuthManager.authToken,
             preferredServerID: plexAuthManager.preferredServerID,
             preferredAccountIDs: plexAuthManager.preferredAccountIDs,
+            force: force
+        )
+        await overseerrLibraryIndex.refresh(
+            baseURL: overseerrAuthManager.baseURL,
+            cookie: overseerrAuthManager.authCookie(),
             force: force
         )
     }
@@ -333,11 +360,17 @@ struct HomeView: View {
                                 )
                             }
                         } label: {
-                            ListPosterCard(
-                                title: item.displayTitle,
-                                subtitle: item.subtitle,
-                                imageURL: viewModel.posterURL(path: item.posterPath)
-                            )
+                            ZStack(alignment: .topLeading) {
+                                ListPosterCard(
+                                    title: item.displayTitle,
+                                    subtitle: item.subtitle,
+                                    imageURL: viewModel.posterURL(path: item.posterPath)
+                                )
+                                if overseerrLibraryIndex.isAvailable(tmdbID: item.id) {
+                                    PosterDogEar()
+                                        .offset(x: 6, y: 6)
+                                }
+                            }
                         }
                         .buttonStyle(.plain)
                     }
@@ -685,6 +718,22 @@ private struct PlexPosterSkeleton: View {
         }
         .redacted(reason: .placeholder)
         .frame(width: posterSize.width, alignment: .leading)
+    }
+}
+
+private struct PosterDogEar: View {
+    var size: CGFloat = 16
+
+    var body: some View {
+        Path { path in
+            path.move(to: .zero)
+            path.addLine(to: CGPoint(x: size, y: 0))
+            path.addLine(to: CGPoint(x: 0, y: size))
+            path.closeSubpath()
+        }
+        .fill(Color.yellow)
+        .shadow(color: Color.black.opacity(0.25), radius: 2, x: 0, y: 1)
+        .frame(width: size, height: size)
     }
 }
 
@@ -1765,4 +1814,7 @@ private enum LiveActivityArtworkStore {
 
 #Preview {
     HomeView()
+        .environmentObject(PlexAuthManager())
+        .environmentObject(OverseerrAuthManager())
+        .environmentObject(OverseerrLibraryIndex())
 }

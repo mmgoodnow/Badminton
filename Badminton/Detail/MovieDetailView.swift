@@ -13,6 +13,7 @@ struct MovieDetailView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
+    @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
 
     init(movieID: Int, title: String? = nil, posterPath: String? = nil) {
         self.movieID = movieID
@@ -53,23 +54,23 @@ struct MovieDetailView: View {
         .macOSSwipeToDismiss()
         .task {
             await viewModel.load()
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
         .refreshable {
             await viewModel.load(force: true)
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
 #if os(macOS) || targetEnvironment(macCatalyst)
         .focusedSceneValue(\.badmintonRefreshAction) {
             await viewModel.load(force: true)
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
 #endif
         .task(id: overseerrAuthManager.isAuthenticated) {
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
         .task(id: overseerrAuthManager.baseURLString) {
-            await overseerrRequest.load(baseURL: overseerrAuthManager.baseURL, cookie: overseerrAuthManager.authCookie())
+            await refreshOverseerr()
         }
     }
 
@@ -198,6 +199,10 @@ struct MovieDetailView: View {
                                     baseURL: overseerrAuthManager.baseURL,
                                     cookie: overseerrAuthManager.authCookie()
                                 )
+                                overseerrLibraryIndex.updateAvailability(
+                                    tmdbID: movieID,
+                                    status: overseerrRequest.mediaStatus
+                                )
                             }
                         }
                         .buttonStyle(.bordered)
@@ -211,6 +216,17 @@ struct MovieDetailView: View {
                 }
             }
         }
+    }
+
+    private func refreshOverseerr() async {
+        await overseerrRequest.load(
+            baseURL: overseerrAuthManager.baseURL,
+            cookie: overseerrAuthManager.authCookie()
+        )
+        overseerrLibraryIndex.updateAvailability(
+            tmdbID: movieID,
+            status: overseerrRequest.mediaStatus
+        )
     }
 
     private var creditsSection: some View {
@@ -440,4 +456,5 @@ final class MovieDetailViewModel: ObservableObject {
         MovieDetailView(movieID: 550, title: "Fight Club")
     }
     .environmentObject(OverseerrAuthManager())
+    .environmentObject(OverseerrLibraryIndex())
 }
