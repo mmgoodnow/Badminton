@@ -27,6 +27,22 @@ struct OverseerrAPIClient {
         return (response.value, cookie)
     }
 
+    func getPublicSettings(baseURL: URL) async throws -> OverseerrPublicSettings {
+        try await get(baseURL: baseURL, path: "/settings/public")
+    }
+
+    func getMovie(baseURL: URL, tmdbID: Int, cookie: String?) async throws -> OverseerrMovieResponse {
+        try await get(baseURL: baseURL, path: "/movie/\(tmdbID)", cookie: cookie)
+    }
+
+    func getTV(baseURL: URL, tmdbID: Int, cookie: String?) async throws -> OverseerrTVResponse {
+        try await get(baseURL: baseURL, path: "/tv/\(tmdbID)", cookie: cookie)
+    }
+
+    func requestMedia(baseURL: URL, body: OverseerrRequestBody, cookie: String?) async throws -> OverseerrRequestResponse {
+        try await post(baseURL: baseURL, path: "/request", body: body, cookie: cookie)
+    }
+
     func get<T: Decodable>(baseURL: URL, path: String, cookie: String? = nil) async throws -> T {
         let url = try makeURL(baseURL: baseURL, path: path)
         var request = URLRequest(url: url)
