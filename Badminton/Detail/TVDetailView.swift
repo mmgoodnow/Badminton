@@ -121,7 +121,6 @@ struct TVDetailView: View {
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.secondary.opacity(0.15))
                         .clipShape(Capsule())
                 }

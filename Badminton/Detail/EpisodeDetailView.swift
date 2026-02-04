@@ -83,6 +83,20 @@ struct EpisodeDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                if let show = viewModel.parentShow {
+                    NavigationLink {
+                        TVDetailView(tvID: show.id, title: show.name, posterPath: show.posterPath)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(show.name)
+                                .font(.subheadline.weight(.semibold))
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
@@ -235,6 +249,7 @@ final class EpisodeDetailViewModel: ObservableObject {
     @Published var credits: TMDBEpisodeCredits?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published private(set) var parentShow: TMDBTVSeriesDetail?
 
     let tvID: Int
     let seasonNumber: Int
@@ -298,11 +313,15 @@ final class EpisodeDetailViewModel: ObservableObject {
             async let credits: TMDBEpisodeCredits = client.getV3(
                 path: "/3/tv/\(tvID)/season/\(seasonNumber)/episode/\(episodeNumber)/credits"
             )
+            async let show: TMDBTVSeriesDetail = client.getV3(
+                path: "/3/tv/\(tvID)"
+            )
 
-            let (configResponse, detailResponse, creditsResponse) = try await (config, detail, credits)
+            let (configResponse, detailResponse, creditsResponse, showResponse) = try await (config, detail, credits, show)
             imageConfig = configResponse.images
             self.detail = detailResponse
             self.credits = creditsResponse
+            self.parentShow = showResponse
             hasLoaded = true
         } catch is CancellationError {
         } catch {

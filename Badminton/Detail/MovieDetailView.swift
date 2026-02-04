@@ -114,6 +114,7 @@ struct MovieDetailView: View {
                             .clipShape(Capsule())
                     }
                 }
+                .padding(.trailing, 2)
             }
         }
     }
