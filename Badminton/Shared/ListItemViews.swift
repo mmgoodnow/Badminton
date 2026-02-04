@@ -378,9 +378,9 @@ private struct PosterDogEar: View {
 
     var body: some View {
         Path { path in
-            path.move(to: .zero)
-            path.addLine(to: CGPoint(x: size, y: 0))
-            path.addLine(to: CGPoint(x: 0, y: size))
+            path.move(to: CGPoint(x: size, y: 0))
+            path.addLine(to: CGPoint(x: size, y: size))
+            path.addLine(to: CGPoint(x: 0, y: 0))
             path.closeSubpath()
         }
         .fill(color)
