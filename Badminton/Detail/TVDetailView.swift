@@ -339,7 +339,7 @@ struct TVDetailView: View {
         }
     }
 
-    private func prepareSeasonSelection(from seasons: [TMDBTVSeason]) {
+    private func prepareSeasonSelection(from seasons: [TMDBTVSeasonSummary]) {
         guard selectedSeasons.isEmpty else { return }
         let available = seasons
             .map { $0.seasonNumber }
