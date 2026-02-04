@@ -54,7 +54,7 @@ struct OverseerrAPIClient {
             request.setValue(cookie, forHTTPHeaderField: "Cookie")
         }
         request.httpBody = try encoder.encode(body)
-        let response = try await perform(request, includeCookies: includeCookies)
+        let response: (value: T, cookie: String?) = try await perform(request, includeCookies: includeCookies)
         return response.value
     }
 
