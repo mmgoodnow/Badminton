@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authManager: TMDBAuthManager
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
+    @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
     @StateObject private var plexServers = PlexServerListViewModel()
     @StateObject private var plexAccounts = PlexAccountListViewModel()
 #if os(iOS)
@@ -23,6 +24,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     tmdbCard
                     plexCard
+                    overseerrCard
 #if os(iOS)
                     liveActivityCard
 #endif
@@ -131,6 +133,61 @@ struct SettingsView: View {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var overseerrCard: some View {
+        settingsCard(
+            title: "Overseerr",
+            subtitle: "Connect Overseerr to request movies and shows from Badminton.",
+            status: overseerrStatus
+        ) {
+            settingsSubcard(title: "Server") {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("https://overseerr.yourdomain.com", text: $overseerrAuthManager.baseURLString)
+                        .textFieldStyle(.roundedBorder)
+#if os(iOS)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+#endif
+                    Text("Include the scheme (https://).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if overseerrAuthManager.isAuthenticated {
+                if let displayName = overseerrAuthManager.userDisplayName, !displayName.isEmpty {
+                    Text("Signed in as \(displayName).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Disconnect Overseerr", role: .destructive) {
+                    overseerrAuthManager.signOut()
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Button(overseerrAuthManager.isAuthenticating ? "Connecting…" : "Connect Overseerr") {
+                    Task { await overseerrAuthManager.signIn(plexToken: plexAuthManager.authToken) }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canConnectOverseerr)
+            }
+
+            if overseerrAuthManager.isAuthenticating {
+                ProgressView("Waiting for Overseerr…")
+            }
+
+            if let errorMessage = overseerrAuthManager.errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            } else if !plexAuthManager.isAuthenticated {
+                Text("Connect Plex first to authenticate with Overseerr.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -299,6 +356,26 @@ struct SettingsView: View {
         return SettingsStatus(text: "Not connected", systemImage: "xmark.circle.fill", color: .secondary)
     }
 
+    private var overseerrStatus: SettingsStatus? {
+        if overseerrAuthManager.isAuthenticated {
+            return SettingsStatus(text: "Connected", systemImage: "checkmark.circle.fill", color: .green)
+        }
+        if overseerrAuthManager.isAuthenticating {
+            return SettingsStatus(text: "Connecting", systemImage: "arrow.triangle.2.circlepath", color: .orange)
+        }
+        if overseerrAuthManager.baseURL == nil {
+            return SettingsStatus(text: "Needs URL", systemImage: "exclamationmark.triangle.fill", color: .orange)
+        }
+        if !plexAuthManager.isAuthenticated {
+            return SettingsStatus(text: "Needs Plex", systemImage: "xmark.circle.fill", color: .secondary)
+        }
+        return SettingsStatus(text: "Not connected", systemImage: "xmark.circle.fill", color: .secondary)
+    }
+
+    private var canConnectOverseerr: Bool {
+        overseerrAuthManager.baseURL != nil && plexAuthManager.isAuthenticated && !overseerrAuthManager.isAuthenticating
+    }
+
     private var settingsBackground: some View {
         ZStack {
             baseBackgroundColor
@@ -409,4 +486,5 @@ private struct SettingsStatus {
     SettingsView()
         .environmentObject(TMDBAuthManager())
         .environmentObject(PlexAuthManager())
+        .environmentObject(OverseerrAuthManager())
 }
