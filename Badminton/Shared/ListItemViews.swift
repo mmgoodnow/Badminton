@@ -13,8 +13,8 @@ struct ListItemStyle {
     var subtitleSpacing: CGFloat
 
     static let standard = ListItemStyle(
-        titleFont: .title2.weight(.semibold),
-        subtitleFont: .body,
+        titleFont: .title3.weight(.semibold),
+        subtitleFont: .subheadline,
         subtitleColor: .secondary,
         rowPosterSize: CGSize(width: 104, height: 156),
         rowPosterCornerRadius: 8,
