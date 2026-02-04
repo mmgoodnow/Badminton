@@ -159,7 +159,8 @@ struct EpisodeDetailView: View {
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath)
+                        imageURL: viewModel.profileURL(path: member.profilePath),
+                        showChevron: true
                     )
                 }
             }
@@ -169,7 +170,8 @@ struct EpisodeDetailView: View {
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath)
+                        imageURL: viewModel.profileURL(path: member.profilePath),
+                        showChevron: true
                     )
                 }
             }
@@ -179,7 +181,8 @@ struct EpisodeDetailView: View {
                     ListItemRow(
                         title: member.name,
                         subtitle: member.job ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath)
+                        imageURL: viewModel.profileURL(path: member.profilePath),
+                        showChevron: true
                     )
                 }
             }
