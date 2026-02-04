@@ -35,11 +35,10 @@ struct TVDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if let detail = viewModel.detail {
                     overviewSection(detail: detail)
-                    infoSection(detail: detail)
                     trailersSection
                     latestEpisodeSection(detail: detail)
                     seasonsSection(detail: detail)
-                    castSection
+                    creditsSection
                 }
             }
             .padding()
@@ -79,12 +78,10 @@ struct TVDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if let date = TMDBDateFormatter.format(viewModel.detail?.firstAirDate) {
-                    Text(date)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                if let detail = viewModel.detail {
+                    quickFacts(detail: detail)
+                    genreChips
                 }
-                genreChips
             }
             Spacer(minLength: 0)
         }
@@ -154,14 +151,16 @@ struct TVDetailView: View {
         }
     }
 
-    private func infoSection(detail: TMDBTVSeriesDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Info")
-                .font(.headline)
-            infoRow(label: "Episodes", value: String(detail.numberOfEpisodes))
-            infoRow(label: "Status", value: detail.status ?? "")
-            if let lastAir = TMDBDateFormatter.format(detail.lastAirDate) {
-                infoRow(label: "Last Air Date", value: lastAir)
+    private func quickFacts(detail: TMDBTVSeriesDetail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let releaseDate = TMDBDateFormatter.format(detail.firstAirDate) {
+                infoStack(label: "Released", value: releaseDate)
+            }
+            infoStack(label: "Seasons", value: "\(detail.numberOfSeasons)")
+            infoStack(label: "Episodes", value: "\(detail.numberOfEpisodes)")
+            infoStack(label: "Score", value: scoreText(from: detail.voteAverage))
+            if let status = detail.status, !status.isEmpty {
+                infoStack(label: "Status", value: status)
             }
         }
     }
@@ -342,58 +341,82 @@ struct TVDetailView: View {
         return parts.joined(separator: " • ")
     }
 
-    private var castSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Top Cast")
-                .font(.headline)
+    private var creditsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
             if let cast = viewModel.credits?.cast, !cast.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(cast.prefix(10)) { member in
-                        NavigationLink {
-                            PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
-                        } label: {
-                            CastRow(
-                                member: member,
-                                imageURL: viewModel.profileURL(path: member.profilePath)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            } else {
-                Text("No cast available")
+                creditsList(title: "Cast", members: Array(cast.prefix(12)))
+            }
+
+            if let crew = viewModel.credits?.crew, !crew.isEmpty {
+                creditsList(title: "Crew", members: Array(crew.prefix(12)))
+            }
+
+            if viewModel.credits == nil || (viewModel.credits?.cast.isEmpty == true && viewModel.credits?.crew.isEmpty == true) {
+                Text("No credits available")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    private func infoRow(label: String, value: String) -> some View {
-        HStack {
+    private func creditsList(title: String, members: [TMDBCastMember]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListItemRow(
+                            title: member.name,
+                            subtitle: member.character ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func creditsList(title: String, members: [TMDBCrewMember]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(members) { member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListItemRow(
+                            title: member.name,
+                            subtitle: member.job ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func infoStack(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
-            Spacer(minLength: 0)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
+    }
+
+    private func scoreText(from score: Double) -> String {
+        "\(Int((score * 10).rounded()))%"
     }
 
     private func showLightbox(url: URL, title: String) {
         lightboxItem = ImageLightboxItem(url: url, title: title)
-    }
-}
-
-private struct CastRow: View {
-    let member: TMDBCastMember
-    let imageURL: URL?
-
-    var body: some View {
-        ListItemRow(
-            title: member.name,
-            subtitle: member.character ?? "",
-            imageURL: imageURL
-        )
     }
 }
 

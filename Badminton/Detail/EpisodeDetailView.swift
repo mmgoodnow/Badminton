@@ -45,8 +45,7 @@ struct EpisodeDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if let detail = viewModel.detail {
                     overviewSection(detail: detail)
-                    infoSection(detail: detail)
-                    castSection
+                    creditsSection
                 }
             }
             .padding()
@@ -77,16 +76,10 @@ struct EpisodeDetailView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(viewModel.title ?? titleFallback ?? "")
                     .font(.title.bold())
-                Text("Season \(seasonNumber) · Episode \(episodeNumber)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let date = TMDBDateFormatter.format(viewModel.detail?.airDate) {
-                    Text(date)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                if let runtime = viewModel.runtimeText {
-                    Text(runtime)
+                if let detail = viewModel.detail {
+                    quickFacts(detail: detail)
+                } else {
+                    Text("Season \(seasonNumber) · Episode \(episodeNumber)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -130,74 +123,109 @@ struct EpisodeDetailView: View {
         }
     }
 
-    private func infoSection(detail: TMDBEpisodeDetail) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Info")
-                .font(.headline)
-            if let rating = detail.voteAverage {
-                infoRow(label: "Rating", value: String(format: "%.1f", rating))
-            }
-            if let votes = detail.voteCount {
-                infoRow(label: "Votes", value: "\(votes)")
+    private func quickFacts(detail: TMDBEpisodeDetail) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            infoStack(label: "Episode", value: "Season \(seasonNumber) · Episode \(episodeNumber)")
+            if let date = TMDBDateFormatter.format(detail.airDate) {
+                infoStack(label: "Released", value: date)
             }
             if let runtime = viewModel.runtimeText {
-                infoRow(label: "Runtime", value: runtime)
+                infoStack(label: "Runtime", value: runtime)
+            }
+            if let score = detail.voteAverage {
+                infoStack(label: "Score", value: scoreText(from: score))
             }
         }
     }
 
-    private var castSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Cast")
-                .font(.headline)
-            if !viewModel.castMembers.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(viewModel.castMembers.prefix(12)) { member in
-                        NavigationLink {
-                            PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
-                        } label: {
-                            EpisodeCastRow(
-                                member: member,
-                                imageURL: viewModel.profileURL(path: member.profilePath)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+    private var creditsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !viewModel.guestStars.isEmpty {
+                creditsList(title: "Guests", members: Array(viewModel.guestStars.prefix(12))) { member in
+                    ListItemRow(
+                        title: member.name,
+                        subtitle: member.character ?? "",
+                        imageURL: viewModel.profileURL(path: member.profilePath)
+                    )
                 }
-            } else {
-                Text("No cast available")
+            }
+
+            if !viewModel.castMembers.isEmpty {
+                creditsList(title: "Cast", members: Array(viewModel.castMembers.prefix(12))) { member in
+                    ListItemRow(
+                        title: member.name,
+                        subtitle: member.character ?? "",
+                        imageURL: viewModel.profileURL(path: member.profilePath)
+                    )
+                }
+            }
+
+            if !viewModel.crewMembers.isEmpty {
+                creditsList(title: "Crew", members: Array(viewModel.crewMembers.prefix(12))) { member in
+                    ListItemRow(
+                        title: member.name,
+                        subtitle: member.job ?? "",
+                        imageURL: viewModel.profileURL(path: member.profilePath)
+                    )
+                }
+            }
+
+            if viewModel.guestStars.isEmpty && viewModel.castMembers.isEmpty && viewModel.crewMembers.isEmpty {
+                Text("No credits available")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    private func infoRow(label: String, value: String) -> some View {
-        HStack {
+    private func creditsList<T: Identifiable>(
+        title: String,
+        members: [T],
+        @ViewBuilder row: @escaping (T) -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(members) { member in
+                    if let cast = member as? TMDBCastMember {
+                        NavigationLink {
+                            PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
+                        } label: {
+                            row(member)
+                        }
+                        .buttonStyle(.plain)
+                    } else if let crew = member as? TMDBCrewMember {
+                        NavigationLink {
+                            PersonDetailView(personID: crew.id, name: crew.name, profilePath: crew.profilePath)
+                        } label: {
+                            row(member)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        row(member)
+                    }
+                }
+            }
+        }
+    }
+
+    private func infoStack(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
-            Spacer(minLength: 0)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
+    }
+
+    private func scoreText(from score: Double) -> String {
+        "\(Int((score * 10).rounded()))%"
     }
 
     private func showLightbox(url: URL, title: String) {
         lightboxItem = ImageLightboxItem(url: url, title: title)
-    }
-}
-
-private struct EpisodeCastRow: View {
-    let member: TMDBCastMember
-    let imageURL: URL?
-
-    var body: some View {
-        ListItemRow(
-            title: member.name,
-            subtitle: member.character ?? "",
-            imageURL: imageURL
-        )
     }
 }
 
@@ -240,10 +268,16 @@ final class EpisodeDetailViewModel: ObservableObject {
         return "\(minutes)m"
     }
 
+    var guestStars: [TMDBCastMember] {
+        credits?.guestStars ?? []
+    }
+
     var castMembers: [TMDBCastMember] {
-        let combined = (credits?.cast ?? []) + (credits?.guestStars ?? [])
-        var seen = Set<Int>()
-        return combined.filter { seen.insert($0.id).inserted }
+        credits?.cast ?? []
+    }
+
+    var crewMembers: [TMDBCrewMember] {
+        credits?.crew ?? []
     }
 
     func load(force: Bool = false) async {
