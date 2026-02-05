@@ -384,7 +384,7 @@ private struct PosterDogEar: View {
             path.closeSubpath()
         }
         .fill(color)
-        .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+        .shadow(color: Color.black.opacity(0.28), radius: 3, x: 0, y: 2)
         .frame(width: size, height: size)
     }
 }
