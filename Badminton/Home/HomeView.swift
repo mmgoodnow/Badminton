@@ -8,6 +8,7 @@ struct HomeView: View {
     @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
     @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
+    @Environment(\.listItemStyle) private var listItemStyle
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingSettings = false
     @State private var navigationPath = NavigationPath()
@@ -308,7 +309,8 @@ struct HomeView: View {
 
     private func plexPosterSize(for item: PlexRecentlyWatchedItem) -> CGSize? {
         if item.isEpisode {
-            return CGSize(width: 216, height: 122)
+            let targetHeight = listItemStyle.cardPosterSize.height
+            return CGSize(width: targetHeight * (16.0 / 9.0), height: targetHeight)
         }
         return nil
     }
