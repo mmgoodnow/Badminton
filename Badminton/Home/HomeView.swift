@@ -309,8 +309,7 @@ struct HomeView: View {
 
     private func plexPosterSize(for item: PlexRecentlyWatchedItem) -> CGSize? {
         if item.isEpisode {
-            let targetHeight = listItemStyle.cardPosterSize.height
-            return CGSize(width: targetHeight * (16.0 / 9.0), height: targetHeight)
+            return listItemStyle.cardPosterSize
         }
         return nil
     }
