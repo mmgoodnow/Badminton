@@ -178,13 +178,13 @@ final class PlexAPIClient {
         let selected = pickBest(from: plexDirect)
             ?? pickBest(from: nonRelay)
             ?? candidates.first(where: { $0.uri != nil })?.uri
-#if DEBUG
-        if let selected, let connection = candidates.first(where: { $0.uri == selected }) {
-            print("Plex selected connection: \(selected) local=\(connection.isLocal) relay=\(connection.isRelay) plexDirect=\(connection.isPlexDirect) ipv6=\(connection.isIPv6Address)")
-        } else if let selected {
-            print("Plex selected connection: \(selected)")
+        if PlexConfig.logConnectionSelection {
+            if let selected, let connection = candidates.first(where: { $0.uri == selected }) {
+                print("Plex selected connection: \(selected) local=\(connection.isLocal) relay=\(connection.isRelay) plexDirect=\(connection.isPlexDirect) ipv6=\(connection.isIPv6Address)")
+            } else if let selected {
+                print("Plex selected connection: \(selected)")
+            }
         }
-#endif
         return selected
     }
 

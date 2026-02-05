@@ -5,6 +5,7 @@ enum PlexConfig {
     static let authBaseURL = URL(string: "https://app.plex.tv/auth/")!
     static let productName = "Badminton"
     static let redirectURI = "badminton://auth/plex"
+    static let logConnectionSelection = ProcessInfo.processInfo.environment["BADMINTON_PLEX_LOG_CONNECTIONS"] == "1"
 
     static var clientIdentifier: String {
         PlexClientIDStore.shared.clientIdentifier
