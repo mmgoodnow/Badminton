@@ -328,7 +328,7 @@ struct MovieDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(members) { member in
+                ForEach(members, id: \.self) { member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -343,7 +343,7 @@ struct MovieDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(members) { member in
+                ForEach(members, id: \.self) { member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
