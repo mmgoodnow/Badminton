@@ -177,12 +177,12 @@ struct PlexHistoryItem: Decodable, Identifiable {
     }
 
     var imageURL: URL? {
-        let candidate = thumb ?? grandparentThumb ?? parentThumb
+        let candidate = preferredArtworkPath
         return PlexHistoryItem.resolveURL(path: candidate)
     }
 
     func imageURL(serverBaseURL: URL, token: String) -> URL? {
-        guard var path = thumb ?? grandparentThumb ?? parentThumb, !path.isEmpty else { return nil }
+        guard var path = preferredArtworkPath, !path.isEmpty else { return nil }
         if path.hasPrefix("/") {
             path.removeFirst()
         }
@@ -196,6 +196,14 @@ struct PlexHistoryItem: Decodable, Identifiable {
             }
         }
         return url
+    }
+
+    private var preferredArtworkPath: String? {
+        if type?.lowercased() == "episode" {
+            // Prefer the parent show poster for episodes to avoid awkward still cropping in poster/still rails.
+            return grandparentThumb ?? parentThumb ?? thumb
+        }
+        return thumb ?? grandparentThumb ?? parentThumb
     }
 
     private static func resolveURL(path: String?) -> URL? {
