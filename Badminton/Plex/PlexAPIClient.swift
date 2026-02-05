@@ -197,7 +197,8 @@ final class PlexAPIClient {
         let serverToken = server.accessToken ?? token
         let serverURL = server.baseURL
         let start = 0
-        let oneWeekAgo = Int(Date().addingTimeInterval(-7 * 24 * 60 * 60).timeIntervalSince1970)
+        let oneMonthAgoDate = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date().addingTimeInterval(-30 * 24 * 60 * 60)
+        let oneMonthAgo = Int(oneMonthAgoDate.timeIntervalSince1970)
 
         var components = URLComponents()
         components.queryItems = [
@@ -212,7 +213,7 @@ final class PlexAPIClient {
         if !encodedQuery.isEmpty {
             encodedQuery.append("&")
         }
-        encodedQuery.append("viewedAt>=\(oneWeekAgo)")
+        encodedQuery.append("viewedAt>=\(oneMonthAgo)")
         let baseURLString = serverURL.appendingPathComponent("status/sessions/history/all").absoluteString
         let rawURLString = "\(baseURLString)?\(encodedQuery)"
         let fallbackURLString = rawURLString.replacingOccurrences(of: "viewedAt>=", with: "viewedAt%3E%3D=")
