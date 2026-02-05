@@ -1,2 +1,5 @@
 .DS_Store
 Secrets.xcconfig
+.codex/
+Badminton.xcodeproj/project.xcworkspace/xcuserdata/
+image.png

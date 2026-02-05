@@ -766,9 +766,6 @@ struct TVDetailView: View {
 
     private func compactCreditsList(cast members: [TMDBCastMember]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No photo")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
             LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
                 ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
@@ -796,9 +793,6 @@ struct TVDetailView: View {
 
     private func compactCreditsList(crew members: [TMDBCrewMember]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No photo")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
             LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
                 ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
