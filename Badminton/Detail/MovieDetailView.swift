@@ -257,7 +257,6 @@ struct MovieDetailView: View {
                 .font(.footnote.weight(.semibold))
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(filled ? Color.yellow : Color.clear)
