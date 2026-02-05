@@ -210,7 +210,7 @@ struct MovieDetailView: View {
                     )
                 }
             }
-            .buttonStyle(plexRequestState == .notRequested ? .borderedProminent : .bordered)
+            .buttonStyle(plexRequestState == .notRequested ? BorderedProminentButtonStyle() : BorderedButtonStyle())
             .tint(.yellow)
             .foregroundStyle(plexRequestState == .notRequested ? .black : .primary)
             .disabled(plexRequestState != .notRequested)
