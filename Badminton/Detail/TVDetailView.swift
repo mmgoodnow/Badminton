@@ -618,11 +618,11 @@ struct TVDetailView: View {
     private var creditsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let cast = viewModel.credits?.cast, !cast.isEmpty {
-                creditsList(title: "Cast", members: Array(cast.prefix(12)))
+                creditsList(title: "Cast", members: cast)
             }
 
             if let crew = viewModel.credits?.crew, !crew.isEmpty {
-                creditsList(title: "Crew", members: Array(crew.prefix(12)))
+                creditsList(title: "Crew", members: crew)
             }
 
             if viewModel.credits == nil || (viewModel.credits?.cast.isEmpty == true && viewModel.credits?.crew.isEmpty == true) {
@@ -870,7 +870,7 @@ final class TVDetailViewModel: ObservableObject {
                     }
                 }
                 let trailers = videosResponse.results.filter { $0.type == "Trailer" }
-                return (configResponse.images, detailResponse, creditsResponse, trailers, latestSeasonNumber, latestEpisodes)
+                return (configResponse.images, detailResponse, creditsResponse.dedupingCrew(), trailers, latestSeasonNumber, latestEpisodes)
             }.value
 
             imageConfig = result.0

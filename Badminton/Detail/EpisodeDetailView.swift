@@ -156,7 +156,7 @@ struct EpisodeDetailView: View {
     private var creditsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             if !viewModel.castMembers.isEmpty {
-                creditsList(title: "Cast", members: Array(viewModel.castMembers.prefix(12))) { member in
+                creditsList(title: "Cast", members: viewModel.castMembers) { member in
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
@@ -167,7 +167,7 @@ struct EpisodeDetailView: View {
             }
 
             if !viewModel.guestStars.isEmpty {
-                creditsList(title: "Guests", members: Array(viewModel.guestStars.prefix(12))) { member in
+                creditsList(title: "Guests", members: viewModel.guestStars) { member in
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
@@ -178,7 +178,7 @@ struct EpisodeDetailView: View {
             }
 
             if !viewModel.crewMembers.isEmpty {
-                creditsList(title: "Crew", members: Array(viewModel.crewMembers.prefix(12))) { member in
+                creditsList(title: "Crew", members: viewModel.crewMembers) { member in
                     ListItemRow(
                         title: member.name,
                         subtitle: member.job ?? "",
@@ -364,7 +364,7 @@ final class EpisodeDetailViewModel: ObservableObject {
             let (configResponse, detailResponse, creditsResponse, showResponse) = try await (config, detail, credits, show)
             imageConfig = configResponse.images
             self.detail = detailResponse
-            self.credits = creditsResponse
+            self.credits = creditsResponse.dedupingCrew()
             self.parentShow = showResponse
             hasLoaded = true
         } catch is CancellationError {

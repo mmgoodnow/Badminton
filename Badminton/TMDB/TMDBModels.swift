@@ -205,6 +205,12 @@ struct TMDBEpisodeCredits: Decodable, Hashable {
     let guestStars: [TMDBCastMember]?
 }
 
+extension TMDBEpisodeCredits {
+    func dedupingCrew() -> TMDBEpisodeCredits {
+        TMDBEpisodeCredits(id: id, cast: cast, crew: TMDBCrewMember.dedupingPrimary(crew), guestStars: guestStars)
+    }
+}
+
 struct TMDBPersonDetail: Decodable, Identifiable, Hashable {
     let id: Int
     let name: String
@@ -227,6 +233,12 @@ struct TMDBCredits: Decodable, Hashable {
     let crew: [TMDBCrewMember]
 }
 
+extension TMDBCredits {
+    func dedupingCrew() -> TMDBCredits {
+        TMDBCredits(id: id, cast: cast, crew: TMDBCrewMember.dedupingPrimary(crew))
+    }
+}
+
 struct TMDBCastMember: Decodable, Identifiable, Hashable {
     let id: Int
     let name: String
@@ -243,6 +255,19 @@ struct TMDBCrewMember: Decodable, Identifiable, Hashable {
     let profilePath: String?
     let job: String?
     let department: String?
+}
+
+extension TMDBCrewMember {
+    static func dedupingPrimary(_ crew: [TMDBCrewMember]) -> [TMDBCrewMember] {
+        var seen = Set<Int>()
+        return crew.filter { member in
+            let trimmedName = member.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedName.isEmpty else { return false }
+            guard !seen.contains(member.id) else { return false }
+            seen.insert(member.id)
+            return true
+        }
+    }
 }
 
 struct TMDBCombinedCredits: Decodable, Hashable {
