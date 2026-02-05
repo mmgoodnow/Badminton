@@ -657,7 +657,8 @@ struct TVDetailView: View {
     }
 
     private func creditsList(title: String, members: [TMDBCastMember]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
             #if os(macOS)
@@ -666,7 +667,7 @@ struct TVDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(members, id: \.self) { member in
+                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -681,7 +682,7 @@ struct TVDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(members, id: \.self) { member in
+                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -893,7 +894,7 @@ final class TVDetailViewModel: ObservableObject {
                     }
                 }
                 let trailers = videosResponse.results.filter { $0.type == "Trailer" }
-                return (configResponse.images, detailResponse, creditsResponse.dedupingCrew(), trailers, latestSeasonNumber, latestEpisodes)
+                return (configResponse.images, detailResponse, creditsResponse.dedupingPeople(), trailers, latestSeasonNumber, latestEpisodes)
             }.value
 
             imageConfig = result.0

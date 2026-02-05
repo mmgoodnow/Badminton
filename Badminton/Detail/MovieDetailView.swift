@@ -514,7 +514,7 @@ final class MovieDetailViewModel: ObservableObject {
             let (configResponse, detailResponse, creditsResponse, videosResponse) = try await (config, detail, credits, videos)
             imageConfig = configResponse.images
             self.detail = detailResponse
-            self.credits = creditsResponse.dedupingCrew()
+            self.credits = creditsResponse.dedupingPeople()
             trailers = videosResponse.results.filter { $0.type == "Trailer" }
             hasLoaded = true
         } catch is CancellationError {

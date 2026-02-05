@@ -210,7 +210,7 @@ struct EpisodeDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(members) { member in
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     if let cast = member as? TMDBCastMember {
                         NavigationLink {
                             PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
@@ -240,7 +240,7 @@ struct EpisodeDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(members) { member in
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     if let cast = member as? TMDBCastMember {
                         NavigationLink {
                             PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
@@ -364,7 +364,7 @@ final class EpisodeDetailViewModel: ObservableObject {
             let (configResponse, detailResponse, creditsResponse, showResponse) = try await (config, detail, credits, show)
             imageConfig = configResponse.images
             self.detail = detailResponse
-            self.credits = creditsResponse.dedupingCrew()
+            self.credits = creditsResponse.dedupingPeople()
             self.parentShow = showResponse
             hasLoaded = true
         } catch is CancellationError {

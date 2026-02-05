@@ -420,7 +420,8 @@ final class PersonDetailViewModel: ObservableObject {
             }
             return lhs.displayTitle < rhs.displayTitle
         }
-        credits = Array(sorted.prefix(40))
+        let deduped = dedupeCredits(sorted)
+        credits = Array(deduped.prefix(40))
         let knownForCandidates = sorted.filter { !isSelfRole($0) }
         let knownForSource = knownForCandidates.isEmpty ? sorted : knownForCandidates
         let knownForUnique = dedupeCredits(knownForSource)
