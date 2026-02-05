@@ -12,6 +12,7 @@ struct MovieDetailView: View {
     @State private var lightboxItem: ImageLightboxItem?
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
+    @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
     @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
 
@@ -76,7 +77,7 @@ struct MovieDetailView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            posterView
+            posterStack
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? titleFallback ?? "")
                     .font(.title.bold())
@@ -87,7 +88,6 @@ struct MovieDetailView: View {
                 }
                 if let detail = viewModel.detail {
                     quickFacts(detail: detail)
-                    overseerrControls
                     genreChips
                 }
             }
@@ -96,21 +96,29 @@ struct MovieDetailView: View {
     }
 
     @ViewBuilder
-    private var posterView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.2))
-            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
-                KFImage(url)
-                    .resizable()
-                    .scaledToFill()
+    private var posterStack: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                    KFImage(url)
+                        .resizable()
+                        .scaledToFill()
+                }
             }
-        }
-        .frame(width: 140, height: 210)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
-                showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+            .frame(width: 140, height: 210)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                    showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+                }
+            }
+            plexStatusButton
+            if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
             }
         }
     }
@@ -186,51 +194,65 @@ struct MovieDetailView: View {
         }
     }
 
-    private var overseerrControls: some View {
+    private var plexStatusButton: some View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    infoStack(
-                        label: "Plex",
-                        value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
-                    )
-                    ZStack(alignment: .leading) {
-                        if overseerrRequest.isLoading {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(width: 120, height: 28)
-                                .redacted(reason: .placeholder)
-                        } else if overseerrRequest.canRequest {
-                            let hasRequested = overseerrRequest.requestStatus != nil
-                                || (overseerrRequest.mediaStatus != nil
-                                    && overseerrRequest.mediaStatus != .unknown
-                                    && overseerrRequest.mediaStatus != .deleted)
-                            let buttonTitle = hasRequested ? "Requested" : "Request"
-                            Button(buttonTitle) {
-                                Task {
-                                    await overseerrRequest.request(
-                                        baseURL: overseerrAuthManager.baseURL,
-                                        cookie: overseerrAuthManager.authCookie()
-                                    )
-                                    overseerrLibraryIndex.updateAvailability(
-                                        tmdbID: movieID,
-                                        status: overseerrRequest.mediaStatus
-                                    )
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(hasRequested)
-                        }
+                let serverName = plexAuthManager.preferredServerName ?? "Plex"
+                let state = plexRequestState
+                let title: String
+                switch state {
+                case .loading:
+                    title = "Checking Plex…"
+                case .available:
+                    title = "Available on \(serverName)"
+                case .requested:
+                    title = "Requested on \(serverName)"
+                case .notRequested:
+                    title = "Request on \(serverName)"
+                }
+                Button(title) {
+                    guard state == .notRequested else { return }
+                    Task {
+                        await overseerrRequest.request(
+                            baseURL: overseerrAuthManager.baseURL,
+                            cookie: overseerrAuthManager.authCookie()
+                        )
+                        overseerrLibraryIndex.updateAvailability(
+                            tmdbID: movieID,
+                            status: overseerrRequest.mediaStatus
+                        )
                     }
-                    .frame(height: 30, alignment: .leading)
                 }
-                if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
+                .buttonStyle(state == .notRequested ? .borderedProminent : .bordered)
+                .tint(.yellow)
+                .foregroundStyle(state == .notRequested ? .black : .primary)
+                .disabled(state != .notRequested)
+                .frame(width: 140)
             }
         }
+    }
+
+    private enum PlexRequestState {
+        case loading
+        case available
+        case requested
+        case notRequested
+    }
+
+    private var plexRequestState: PlexRequestState {
+        if overseerrRequest.isLoading {
+            return .loading
+        }
+        if overseerrRequest.mediaStatus == .available {
+            return .available
+        }
+        if overseerrRequest.requestStatus != nil {
+            return .requested
+        }
+        if let status = overseerrRequest.mediaStatus, status != .unknown, status != .deleted {
+            return .requested
+        }
+        return .notRequested
     }
 
     private func refreshOverseerr() async {

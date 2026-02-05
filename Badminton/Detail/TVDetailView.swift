@@ -16,6 +16,7 @@ struct TVDetailView: View {
     @State private var requestSeasons: [TMDBTVSeasonSummary] = []
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
+    @EnvironmentObject private var plexAuthManager: PlexAuthManager
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
     @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
 
@@ -86,7 +87,7 @@ struct TVDetailView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 16) {
-            posterView
+            posterStack
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? titleFallback ?? "")
                     .font(.title.bold())
@@ -97,7 +98,6 @@ struct TVDetailView: View {
                 }
                 if let detail = viewModel.detail {
                     quickFacts(detail: detail)
-                    overseerrControls(detail: detail)
                     genreChips
                 }
             }
@@ -106,21 +106,29 @@ struct TVDetailView: View {
     }
 
     @ViewBuilder
-    private var posterView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.2))
-            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
-                KFImage(url)
-                    .resizable()
-                    .scaledToFill()
+    private var posterStack: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.2))
+                if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                    KFImage(url)
+                        .resizable()
+                        .scaledToFill()
+                }
             }
-        }
-        .frame(width: 140, height: 210)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
-                showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+            .frame(width: 140, height: 210)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
+                    showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
+                }
+            }
+            plexStatusButton
+            if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
             }
         }
     }
@@ -182,45 +190,67 @@ struct TVDetailView: View {
         }
     }
 
-    private func overseerrControls(detail: TMDBTVSeriesDetail) -> some View {
+    private var plexStatusButton: some View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-                VStack(alignment: .leading, spacing: 8) {
-                    infoStack(
-                        label: "Plex",
-                        value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
+                let serverName = plexAuthManager.preferredServerName ?? "Plex"
+                let state = plexRequestState
+                let title: String
+                switch state {
+                case .loading:
+                    title = "Checking Plex…"
+                case .available:
+                    title = "Available on \(serverName)"
+                case .requested:
+                    title = "Requested on \(serverName)"
+                case .notRequested:
+                    title = "Request on \(serverName)"
+                }
+                Button(title) {
+                    guard state == .notRequested, let detail = viewModel.detail else { return }
+                    let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                    requestSeasons = seasons
+                    prepareSeasonSelection(from: seasons)
+                    AppLog.overseerr.info(
+                        "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
                     )
-                    ZStack(alignment: .leading) {
-                        if overseerrRequest.isLoading {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(width: 140, height: 28)
-                                .redacted(reason: .placeholder)
-                        } else if overseerrRequest.canRequest {
-                            Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
-                                let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
-                                requestSeasons = seasons
-                                prepareSeasonSelection(from: seasons)
-                                AppLog.overseerr.info(
-                                    "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
-                                )
-                                isShowingOverseerrRequest = true
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                    .frame(height: 30, alignment: .leading)
+                    isShowingOverseerrRequest = true
                 }
-                if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
+                .buttonStyle(state == .notRequested ? .borderedProminent : .bordered)
+                .tint(.yellow)
+                .foregroundStyle(state == .notRequested ? .black : .primary)
+                .disabled(state != .notRequested)
+                .frame(width: 140)
             }
         }
         .sheet(isPresented: $isShowingOverseerrRequest) {
-            overseerrRequestSheet(detail: detail)
+            if let detail = viewModel.detail {
+                overseerrRequestSheet(detail: detail)
+            }
         }
+    }
+
+    private enum PlexRequestState {
+        case loading
+        case available
+        case requested
+        case notRequested
+    }
+
+    private var plexRequestState: PlexRequestState {
+        if overseerrRequest.isLoading {
+            return .loading
+        }
+        if overseerrRequest.mediaStatus == .available {
+            return .available
+        }
+        if overseerrRequest.requestStatus != nil {
+            return .requested
+        }
+        if let status = overseerrRequest.mediaStatus, status != .unknown, status != .deleted {
+            return .requested
+        }
+        return .notRequested
     }
 
     private func seasonsSection(detail: TMDBTVSeriesDetail) -> some View {
