@@ -9,6 +9,7 @@ struct PersonDetailView: View {
 
     @StateObject private var viewModel: PersonDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
+    @Environment(\.listItemStyle) private var listItemStyle
 
     init(personID: Int, name: String? = nil, profilePath: String? = nil) {
         self.personID = personID
