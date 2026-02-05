@@ -124,7 +124,7 @@ struct TVDetailView: View {
                     showLightbox(url: url, title: viewModel.title ?? titleFallback ?? "Poster")
                 }
             }
-            plexStatusButton
+            plexStatusButtonContainer
             if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
                 Text(errorMessage)
                     .font(.footnote)
@@ -190,44 +190,34 @@ struct TVDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var plexStatusButton: some View {
-        Group {
-            if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-                let serverName = plexAuthManager.preferredServerName ?? "Plex"
-                let state = plexRequestState
-                let title: String
-                switch state {
-                case .loading:
-                    title = "Checking Plex…"
-                case .available:
-                    title = "Available on \(serverName)"
-                case .requested:
-                    title = "Requested on \(serverName)"
-                case .notRequested:
-                    title = "Request on \(serverName)"
-                }
-                Button(title) {
-                    guard state == .notRequested, let detail = viewModel.detail else { return }
-                    let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
-                    requestSeasons = seasons
-                    prepareSeasonSelection(from: seasons)
-                    AppLog.overseerr.info(
-                        "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
-                    )
-                    isShowingOverseerrRequest = true
-                }
-                .buttonStyle(state == .notRequested ? .borderedProminent : .bordered)
-                .tint(.yellow)
-                .foregroundStyle(state == .notRequested ? .black : .primary)
-                .disabled(state != .notRequested)
-                .frame(width: 140)
+        if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
+            Button(plexButtonTitle) {
+                guard plexRequestState == .notRequested, let detail = viewModel.detail else { return }
+                let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                requestSeasons = seasons
+                prepareSeasonSelection(from: seasons)
+                AppLog.overseerr.info(
+                    "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
+                )
+                isShowingOverseerrRequest = true
             }
+            .buttonStyle(plexRequestState == .notRequested ? .borderedProminent : .bordered)
+            .tint(.yellow)
+            .foregroundStyle(plexRequestState == .notRequested ? .black : .primary)
+            .disabled(plexRequestState != .notRequested)
+            .frame(width: 140)
         }
-        .sheet(isPresented: $isShowingOverseerrRequest) {
-            if let detail = viewModel.detail {
-                overseerrRequestSheet(detail: detail)
+    }
+
+    private var plexStatusButtonContainer: some View {
+        plexStatusButton
+            .sheet(isPresented: $isShowingOverseerrRequest) {
+                if let detail = viewModel.detail {
+                    overseerrRequestSheet(detail: detail)
+                }
             }
-        }
     }
 
     private enum PlexRequestState {
@@ -235,6 +225,23 @@ struct TVDetailView: View {
         case available
         case requested
         case notRequested
+    }
+
+    private var plexServerName: String {
+        plexAuthManager.preferredServerName ?? "Plex"
+    }
+
+    private var plexButtonTitle: String {
+        switch plexRequestState {
+        case .loading:
+            return "Checking Plex…"
+        case .available:
+            return "Available on \(plexServerName)"
+        case .requested:
+            return "Requested on \(plexServerName)"
+        case .notRequested:
+            return "Request on \(plexServerName)"
+        }
     }
 
     private var plexRequestState: PlexRequestState {
