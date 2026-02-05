@@ -58,17 +58,6 @@ struct SettingsView: View {
             subtitle: "Sign in with TMDB to personalize your experience.",
             status: tmdbStatus
         ) {
-            settingsSubcard(title: "Configuration") {
-                VStack(alignment: .leading, spacing: 8) {
-                    configRow(title: "TMDB_API_KEY", isReady: !TMDBConfig.apiKey.isEmpty)
-                    configRow(title: "TMDB_READ_ACCESS_TOKEN", isReady: !TMDBConfig.readAccessToken.isEmpty)
-                    configRow(title: "TMDB_REDIRECT_URI", isReady: !TMDBConfig.redirectURI.isEmpty)
-                    Text("Set these in Secrets.xcconfig or via Xcode Cloud env vars.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             if authManager.isAuthenticated {
                 Button("Disconnect TMDB", role: .destructive) {
                     Task { await authManager.signOut() }
@@ -425,23 +414,6 @@ struct SettingsView: View {
             .background(status.color.opacity(0.15), in: Capsule())
     }
 
-    @ViewBuilder
-    private func configRow(title: String, isReady: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isReady ? .green : .orange)
-            Text(title)
-                .font(.subheadline)
-            Spacer()
-            Text(isReady ? "Set" : "Missing")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(isReady ? .green : .orange)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background((isReady ? Color.green : Color.orange).opacity(0.15), in: Capsule())
-        }
-    }
 }
 
 private struct SettingsStatus {
