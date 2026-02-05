@@ -200,8 +200,8 @@ struct PlexHistoryItem: Decodable, Identifiable {
 
     private var preferredArtworkPath: String? {
         if type?.lowercased() == "episode" {
-            // Prefer the parent show poster for episodes to avoid awkward still cropping in poster/still rails.
-            return grandparentThumb ?? parentThumb ?? thumb
+            // Prefer poster-like artwork for episodes; grandparent thumbs can be backdrop-style in some libraries.
+            return parentThumb ?? grandparentThumb ?? thumb
         }
         return thumb ?? grandparentThumb ?? parentThumb
     }
