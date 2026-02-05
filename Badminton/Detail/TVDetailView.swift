@@ -283,8 +283,8 @@ struct TVDetailView: View {
             ? detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
             : requestSeasons
         return NavigationStack {
-            List {
-                Section {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
                     if seasons.isEmpty {
                         Text("No seasons available.")
                             .font(.footnote)
@@ -317,6 +317,7 @@ struct TVDetailView: View {
                                 ))
                                 .labelsHidden()
                             }
+                            .padding(.vertical, 6)
                         }
                     } else {
                         Text("Plex is configured for full-series requests.")
@@ -324,6 +325,7 @@ struct TVDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .padding()
             }
             .navigationTitle("Request")
             .onAppear {

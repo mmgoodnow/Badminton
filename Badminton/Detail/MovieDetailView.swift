@@ -193,7 +193,14 @@ struct MovieDetailView: View {
                     infoStack(label: "Plex", value: overseerrRequest.statusText)
                     Spacer(minLength: 12)
                     if overseerrRequest.canRequest {
-                        Button("Request") {
+                        let hasRequested = overseerrRequest.requestStatus != nil
+                            || (overseerrRequest.mediaStatus != nil
+                                && overseerrRequest.mediaStatus != .unknown
+                                && overseerrRequest.mediaStatus != .deleted)
+                        let buttonTitle = overseerrRequest.isLoading
+                            ? "Requesting…"
+                            : (hasRequested ? "Requested" : "Request")
+                        Button(buttonTitle) {
                             Task {
                                 await overseerrRequest.request(
                                     baseURL: overseerrAuthManager.baseURL,
@@ -206,7 +213,7 @@ struct MovieDetailView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .disabled(overseerrRequest.isLoading)
+                        .disabled(overseerrRequest.isLoading || hasRequested)
                     }
                 }
                 if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
