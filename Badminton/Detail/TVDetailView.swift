@@ -204,17 +204,17 @@ struct TVDetailView: View {
                     )
                     isShowingOverseerrRequest = true
                 }
-                .buttonStyle(BorderedProminentButtonStyle())
-                .tint(.yellow)
+                .buttonStyle(.plain)
                 .foregroundStyle(.black)
                 .frame(width: 140)
+                .modifier(PlexStatusButtonStyle(filled: true))
             } else {
                 Button(plexButtonTitle) { }
-                    .buttonStyle(BorderedButtonStyle())
-                    .tint(.yellow)
+                    .buttonStyle(.plain)
                     .foregroundStyle(.primary)
                     .disabled(true)
                     .frame(width: 140)
+                    .modifier(PlexStatusButtonStyle(filled: false))
             }
         }
     }
@@ -244,11 +244,31 @@ struct TVDetailView: View {
         case .loading:
             return "Checking Plex…"
         case .available:
-            return "Available on \(plexServerName)"
+            return "Available · \(plexServerName)"
         case .requested:
-            return "Requested on \(plexServerName)"
+            return "Requested · \(plexServerName)"
         case .notRequested:
             return "Request on \(plexServerName)"
+        }
+    }
+
+    private struct PlexStatusButtonStyle: ViewModifier {
+        let filled: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .font(.footnote.weight(.semibold))
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(filled ? Color.yellow : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.yellow, lineWidth: 1.5)
+                )
         }
     }
 
