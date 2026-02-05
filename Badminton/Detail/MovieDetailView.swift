@@ -303,11 +303,11 @@ struct MovieDetailView: View {
     private var creditsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let cast = viewModel.credits?.cast, !cast.isEmpty {
-                creditsList(title: "Cast", members: Array(cast.prefix(12)))
+                creditsList(title: "Cast", members: cast)
             }
 
             if let crew = viewModel.credits?.crew, !crew.isEmpty {
-                creditsList(title: "Crew", members: Array(crew.prefix(12)))
+                creditsList(title: "Crew", members: crew)
             }
 
             if viewModel.credits == nil || (viewModel.credits?.cast.isEmpty == true && viewModel.credits?.crew.isEmpty == true) {
@@ -328,7 +328,7 @@ struct MovieDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(members, id: \.self) { member in
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -343,7 +343,7 @@ struct MovieDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(members, id: \.self) { member in
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -362,6 +362,7 @@ struct MovieDetailView: View {
     }
 
     private func creditsList(title: String, members: [TMDBCrewMember]) -> some View {
+        let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
@@ -371,7 +372,7 @@ struct MovieDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(members) { member in
+                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -386,7 +387,7 @@ struct MovieDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(members) { member in
+                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
