@@ -293,7 +293,8 @@ struct HomeView: View {
                             ListPosterCard(
                                 title: item.title,
                                 subtitle: item.subtitle,
-                                imageURL: item.imageURL
+                                imageURL: item.imageURL,
+                                posterSize: plexPosterSize(for: item)
                             )
                         }
                         .buttonStyle(.plain)
@@ -303,6 +304,13 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func plexPosterSize(for item: PlexRecentlyWatchedItem) -> CGSize? {
+        if item.isEpisode {
+            return CGSize(width: 216, height: 122)
+        }
+        return nil
     }
 
     private func plexColumnSkeleton(title: String) -> some View {
