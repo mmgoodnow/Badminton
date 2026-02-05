@@ -158,6 +158,40 @@ struct PersonDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
+#if os(macOS)
+                LazyVGrid(
+                    columns: gridColumns,
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    ForEach(viewModel.credits) { credit in
+                        let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
+                        let subtitleLines = viewModel.creditSubtitle(
+                            credit,
+                            includeYear: true,
+                            includeAge: true,
+                            lineBreaks: true
+                        )
+                        .split(separator: "\n")
+                        .map(String.init)
+                        let card = ListPosterGridItem(
+                            title: credit.displayTitle,
+                            subtitleLines: subtitleLines,
+                            imageURL: viewModel.posterURL(path: credit.posterPath)
+                        )
+                        if isTappable {
+                            NavigationLink {
+                                creditDestination(credit)
+                            } label: {
+                                card
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            card
+                        }
+                    }
+                }
+#else
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(viewModel.credits) { credit in
                         let isTappable = credit.mediaType == .movie || credit.mediaType == .tv
@@ -184,8 +218,13 @@ struct PersonDetailView: View {
                         }
                     }
                 }
+#endif
             }
         }
+    }
+
+    private var gridColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
     }
 
     private func infoStack(label: String, value: String) -> some View {
