@@ -351,6 +351,7 @@ struct TVDetailView: View {
                                     season.overview ?? ""
                                 ],
                                 imageURL: viewModel.posterURL(path: season.posterPath),
+                                showDogEar: hasSeasonDogEar(seasonNumber: season.seasonNumber),
                                 subtitleLineLimit: 2
                             )
                         }
@@ -370,7 +371,8 @@ struct TVDetailView: View {
                         } label: {
                             SeasonRow(
                                 season: season,
-                                imageURL: viewModel.posterURL(path: season.posterPath)
+                                imageURL: viewModel.posterURL(path: season.posterPath),
+                                showDogEar: hasSeasonDogEar(seasonNumber: season.seasonNumber)
                             )
                         }
                         .buttonStyle(.plain)
@@ -765,11 +767,17 @@ struct TVDetailView: View {
     private func showLightbox(url: URL, title: String) {
         lightboxItem = ImageLightboxItem(url: url, title: title)
     }
+
+    private func hasSeasonDogEar(seasonNumber: Int) -> Bool {
+        guard let status = overseerrRequest.seasonStatuses[seasonNumber] else { return false }
+        return status == .available || status == .partiallyAvailable
+    }
 }
 
 private struct SeasonRow: View {
     let season: TMDBTVSeasonSummary
     let imageURL: URL?
+    let showDogEar: Bool
 
     var body: some View {
         ListItemRow(
@@ -780,6 +788,7 @@ private struct SeasonRow: View {
                 season.overview ?? ""
             ],
             imageURL: imageURL,
+            showDogEar: showDogEar,
             subtitleLineLimit: 2
         )
     }

@@ -124,6 +124,9 @@ struct ListItemRow: View {
     let subtitleLines: [String]
     let imageURL: URL?
     let showChevron: Bool
+    let showDogEar: Bool
+    let dogEarColor: Color
+    let dogEarSize: CGFloat
     let posterSize: CGSize?
     let posterCornerRadius: CGFloat?
     let titleFont: Font?
@@ -139,6 +142,9 @@ struct ListItemRow: View {
         subtitle: String = "",
         imageURL: URL?,
         showChevron: Bool = true,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 26,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
@@ -151,6 +157,9 @@ struct ListItemRow: View {
         self.subtitleLines = subtitle.split(whereSeparator: \.isNewline).map { String($0) }
         self.imageURL = imageURL
         self.showChevron = showChevron
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
         self.posterSize = posterSize
         self.posterCornerRadius = posterCornerRadius
         self.titleFont = titleFont
@@ -165,6 +174,9 @@ struct ListItemRow: View {
         subtitleLines: [String],
         imageURL: URL?,
         showChevron: Bool = true,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 26,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
@@ -177,6 +189,9 @@ struct ListItemRow: View {
         self.subtitleLines = subtitleLines
         self.imageURL = imageURL
         self.showChevron = showChevron
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
         self.posterSize = posterSize
         self.posterCornerRadius = posterCornerRadius
         self.titleFont = titleFont
@@ -188,7 +203,14 @@ struct ListItemRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: style.rowSpacing) {
-            ListPoster(url: imageURL, size: posterSize, cornerRadius: posterCornerRadius)
+            ListPoster(
+                url: imageURL,
+                size: posterSize,
+                cornerRadius: posterCornerRadius,
+                showDogEar: showDogEar,
+                dogEarColor: dogEarColor,
+                dogEarSize: dogEarSize
+            )
             ListItemTextStack(
                 title: title,
                 subtitleLines: subtitleLines,
@@ -289,6 +311,9 @@ struct ListPosterGridItem: View {
     let title: String
     let subtitleLines: [String]
     let imageURL: URL?
+    let showDogEar: Bool
+    let dogEarColor: Color
+    let dogEarSize: CGFloat
     let posterSize: CGSize?
     let posterCornerRadius: CGFloat?
     let titleFont: Font?
@@ -303,6 +328,9 @@ struct ListPosterGridItem: View {
         title: String,
         subtitle: String = "",
         imageURL: URL?,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 26,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
@@ -314,6 +342,9 @@ struct ListPosterGridItem: View {
         self.title = title
         self.subtitleLines = subtitle.split(whereSeparator: \.isNewline).map { String($0) }
         self.imageURL = imageURL
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
         self.posterSize = posterSize
         self.posterCornerRadius = posterCornerRadius
         self.titleFont = titleFont
@@ -327,6 +358,9 @@ struct ListPosterGridItem: View {
         title: String,
         subtitleLines: [String],
         imageURL: URL?,
+        showDogEar: Bool = false,
+        dogEarColor: Color = .yellow,
+        dogEarSize: CGFloat = 26,
         posterSize: CGSize? = nil,
         posterCornerRadius: CGFloat? = nil,
         titleFont: Font? = nil,
@@ -338,6 +372,9 @@ struct ListPosterGridItem: View {
         self.title = title
         self.subtitleLines = subtitleLines
         self.imageURL = imageURL
+        self.showDogEar = showDogEar
+        self.dogEarColor = dogEarColor
+        self.dogEarSize = dogEarSize
         self.posterSize = posterSize
         self.posterCornerRadius = posterCornerRadius
         self.titleFont = titleFont
@@ -355,7 +392,10 @@ struct ListPosterGridItem: View {
             ListPoster(
                 url: imageURL,
                 size: resolvedPosterSize,
-                cornerRadius: resolvedCornerRadius
+                cornerRadius: resolvedCornerRadius,
+                showDogEar: showDogEar,
+                dogEarColor: dogEarColor,
+                dogEarSize: dogEarSize
             )
             ListItemTextStack(
                 title: title,

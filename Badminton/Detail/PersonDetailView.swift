@@ -10,6 +10,7 @@ struct PersonDetailView: View {
     @StateObject private var viewModel: PersonDetailViewModel
     @State private var lightboxItem: ImageLightboxItem?
     @Environment(\.listItemStyle) private var listItemStyle
+    @EnvironmentObject private var overseerrLibraryIndex: OverseerrLibraryIndex
 
     init(personID: Int, name: String? = nil, profilePath: String? = nil) {
         self.personID = personID
@@ -130,7 +131,8 @@ struct PersonDetailView: View {
                             let card = ListPosterCard(
                                 title: credit.displayTitle,
                                 subtitle: viewModel.creditSubtitle(credit, includeAge: false, lineBreaks: false),
-                                imageURL: viewModel.posterURL(path: credit.posterPath)
+                                imageURL: viewModel.posterURL(path: credit.posterPath),
+                                showDogEar: hasDogEar(for: credit)
                             )
                             if credit.mediaType == .movie || credit.mediaType == .tv {
                                 NavigationLink {
@@ -178,7 +180,8 @@ struct PersonDetailView: View {
                         let card = ListPosterGridItem(
                             title: credit.displayTitle,
                             subtitleLines: subtitleLines,
-                            imageURL: viewModel.posterURL(path: credit.posterPath)
+                            imageURL: viewModel.posterURL(path: credit.posterPath),
+                            showDogEar: hasDogEar(for: credit)
                         )
                         if isTappable {
                             NavigationLink {
@@ -205,6 +208,7 @@ struct PersonDetailView: View {
                                 lineBreaks: true
                             ),
                             imageURL: viewModel.posterURL(path: credit.posterPath),
+                            showDogEar: hasDogEar(for: credit),
                             showChevron: isTappable
                         )
                         if isTappable {
@@ -288,6 +292,11 @@ struct PersonDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private func hasDogEar(for credit: TMDBMediaCredit) -> Bool {
+        guard credit.mediaType == .movie || credit.mediaType == .tv else { return false }
+        return overseerrLibraryIndex.isAvailable(tmdbID: credit.id)
     }
 }
 
@@ -501,4 +510,5 @@ final class PersonDetailViewModel: ObservableObject {
     NavigationStack {
         PersonDetailView(personID: 287, name: "Brad Pitt")
     }
+    .environmentObject(OverseerrLibraryIndex())
 }
