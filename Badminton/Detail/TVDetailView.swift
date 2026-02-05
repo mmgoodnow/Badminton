@@ -91,14 +91,13 @@ struct TVDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? titleFallback ?? "")
                     .font(.title.bold())
-                if let tagline = viewModel.detail?.tagline, !tagline.isEmpty {
-                    Text(tagline)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
                 if let detail = viewModel.detail {
+                    if let tagline = detail.tagline, !tagline.isEmpty {
+                        taglineRow(tagline: tagline, genres: detail.genres)
+                    } else {
+                        genreChips(genres: detail.genres)
+                    }
                     quickFacts(detail: detail)
-                    genreChips
                 }
             }
             Spacer(minLength: 0)
@@ -134,8 +133,20 @@ struct TVDetailView: View {
     }
 
     @ViewBuilder
-    private var genreChips: some View {
-        if let genres = viewModel.detail?.genres, !genres.isEmpty {
+    private func taglineRow(tagline: String, genres: [TMDBGenre]) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(tagline)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if !genres.isEmpty {
+                inlineGenreChips(genres: genres)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func genreChips(genres: [TMDBGenre]) -> some View {
+        if !genres.isEmpty {
             #if os(iOS)
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 72, maximum: 160), spacing: 6, alignment: .leading)],
@@ -166,6 +177,23 @@ struct TVDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func inlineGenreChips(genres: [TMDBGenre]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(genres, id: \.id) { genre in
+                    Text(genre.name)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.trailing, 2)
+        }
+    }
+
     private func overviewSection(detail: TMDBTVSeriesDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Overview")
@@ -177,17 +205,40 @@ struct TVDetailView: View {
     }
 
     private func quickFacts(detail: TMDBTVSeriesDetail) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let releaseDate = TMDBDateFormatter.format(detail.firstAirDate) {
-                infoStack(label: "Released", value: releaseDate)
+        let facts = quickFactItems(detail: detail)
+        let columns = max(1, min(2, facts.count))
+        let midpoint = Int(ceil(Double(facts.count) / Double(columns)))
+        let leftFacts = Array(facts.prefix(midpoint))
+        let rightFacts = Array(facts.dropFirst(midpoint))
+
+        return HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(leftFacts.enumerated()), id: \.offset) { _, fact in
+                    infoStack(label: fact.label, value: fact.value)
+                }
             }
-            infoStack(label: "Seasons", value: "\(detail.numberOfSeasons)")
-            infoStack(label: "Episodes", value: "\(detail.numberOfEpisodes)")
-            infoStack(label: "Score", value: scoreText(from: detail.voteAverage))
-            if let status = detail.status, !status.isEmpty {
-                infoStack(label: "Status", value: status)
+            if !rightFacts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(rightFacts.enumerated()), id: \.offset) { _, fact in
+                        infoStack(label: fact.label, value: fact.value)
+                    }
+                }
             }
         }
+    }
+
+    private func quickFactItems(detail: TMDBTVSeriesDetail) -> [(label: String, value: String)] {
+        var items: [(label: String, value: String)] = []
+        if let releaseDate = TMDBDateFormatter.format(detail.firstAirDate) {
+            items.append((label: "Released", value: releaseDate))
+        }
+        items.append((label: "Seasons", value: "\(detail.numberOfSeasons)"))
+        items.append((label: "Episodes", value: "\(detail.numberOfEpisodes)"))
+        items.append((label: "Score", value: scoreText(from: detail.voteAverage)))
+        if let status = detail.status, !status.isEmpty {
+            items.append((label: "Status", value: status))
+        }
+        return items
     }
 
     @ViewBuilder

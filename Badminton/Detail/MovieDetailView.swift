@@ -81,14 +81,13 @@ struct MovieDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(viewModel.title ?? titleFallback ?? "")
                     .font(.title.bold())
-                if let tagline = viewModel.detail?.tagline, !tagline.isEmpty {
-                    Text(tagline)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
                 if let detail = viewModel.detail {
+                    if let tagline = detail.tagline, !tagline.isEmpty {
+                        taglineRow(tagline: tagline, genres: detail.genres)
+                    } else {
+                        genreChips(genres: detail.genres)
+                    }
                     quickFacts(detail: detail)
-                    genreChips
                 }
             }
             Spacer(minLength: 0)
@@ -124,8 +123,20 @@ struct MovieDetailView: View {
     }
 
     @ViewBuilder
-    private var genreChips: some View {
-        if let genres = viewModel.detail?.genres, !genres.isEmpty {
+    private func taglineRow(tagline: String, genres: [TMDBGenre]) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(tagline)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if !genres.isEmpty {
+                inlineGenreChips(genres: genres)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func genreChips(genres: [TMDBGenre]) -> some View {
+        if !genres.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(genres, id: \.id) { genre in
@@ -139,6 +150,23 @@ struct MovieDetailView: View {
                 }
                 .padding(.trailing, 2)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func inlineGenreChips(genres: [TMDBGenre]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(genres, id: \.id) { genre in
+                    Text(genre.name)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.trailing, 2)
         }
     }
 
@@ -180,18 +208,44 @@ struct MovieDetailView: View {
     }
 
     private func quickFacts(detail: TMDBMovieDetail) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let releaseDate = TMDBDateFormatter.format(detail.releaseDate) {
-                infoStack(label: "Released", value: releaseDate)
+        let facts = quickFactItems(detail: detail)
+        let columns = max(1, min(2, facts.count))
+        let midpoint = Int(ceil(Double(facts.count) / Double(columns)))
+        let leftFacts = Array(facts.prefix(midpoint))
+        let rightFacts = Array(facts.dropFirst(midpoint))
+
+        return HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(leftFacts.enumerated()), id: \.offset) { _, fact in
+                    infoStack(label: fact.label, value: fact.value)
+                }
             }
-            if let runtime = viewModel.runtimeText, !runtime.isEmpty {
-                infoStack(label: "Runtime", value: runtime)
-            }
-            infoStack(label: "Score", value: scoreText(from: detail.voteAverage))
-            if let status = detail.status, !status.isEmpty {
-                infoStack(label: "Status", value: status)
+            if !rightFacts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(rightFacts.enumerated()), id: \.offset) { _, fact in
+                        infoStack(label: fact.label, value: fact.value)
+                    }
+                }
             }
         }
+    }
+
+    private func quickFactItems(detail: TMDBMovieDetail) -> [(label: String, value: String)] {
+        var items: [(label: String, value: String)] = []
+        if let releaseDate = TMDBDateFormatter.format(detail.releaseDate) {
+            items.append((label: "Released", value: releaseDate))
+        }
+        if let runtime = viewModel.runtimeText, !runtime.isEmpty {
+            items.append((label: "Runtime", value: runtime))
+        }
+        if let director = viewModel.directorName, !director.isEmpty {
+            items.append((label: "Director", value: director))
+        }
+        items.append((label: "Score", value: scoreText(from: detail.voteAverage)))
+        if let status = detail.status, !status.isEmpty {
+            items.append((label: "Status", value: status))
+        }
+        return items
     }
 
     @ViewBuilder
@@ -459,6 +513,10 @@ final class MovieDetailViewModel: ObservableObject {
             return "\(hours)h \(minutes)m"
         }
         return "\(minutes)m"
+    }
+
+    var directorName: String? {
+        credits?.crew.first { $0.job == "Director" }?.name
     }
 
     func load(force: Bool = false) async {
