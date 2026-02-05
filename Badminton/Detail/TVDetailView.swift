@@ -287,7 +287,7 @@ struct TVDetailView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else if overseerrRequest.partialRequestsEnabled {
-                        ForEach(seasons, id: \.id) { season in
+                        ForEach(seasons, id: \.seasonNumber) { season in
                             HStack(alignment: .center, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(season.name)
@@ -323,6 +323,11 @@ struct TVDetailView: View {
                 }
             }
             .navigationTitle("Request")
+            .onAppear {
+                if requestSeasons.isEmpty && !detail.seasons.isEmpty {
+                    requestSeasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
