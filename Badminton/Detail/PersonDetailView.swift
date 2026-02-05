@@ -208,8 +208,8 @@ struct PersonDetailView: View {
                                 lineBreaks: true
                             ),
                             imageURL: viewModel.posterURL(path: credit.posterPath),
-                            showDogEar: hasDogEar(for: credit),
-                            showChevron: isTappable
+                            showChevron: isTappable,
+                            showDogEar: hasDogEar(for: credit)
                         )
                         if isTappable {
                             NavigationLink {
