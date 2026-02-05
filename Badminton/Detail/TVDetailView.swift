@@ -206,14 +206,14 @@ struct TVDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.black)
-                .modifier(PlexStatusButtonStyle(filled: true))
+                .modifier(PlexStatusButtonStyle(filled: true, width: posterWidth))
                 .frame(width: posterWidth)
             } else {
                 Button(plexButtonTitle) { }
                     .buttonStyle(.plain)
                     .foregroundStyle(.primary)
                     .disabled(true)
-                    .modifier(PlexStatusButtonStyle(filled: false))
+                    .modifier(PlexStatusButtonStyle(filled: false, width: posterWidth))
                     .frame(width: posterWidth)
             }
         }
@@ -256,12 +256,14 @@ struct TVDetailView: View {
 
     private struct PlexStatusButtonStyle: ViewModifier {
         let filled: Bool
+        let width: CGFloat
 
         func body(content: Content) -> some View {
             content
                 .font(.footnote.weight(.semibold))
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)
+                .frame(width: width)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(filled ? Color.yellow : Color.clear)
