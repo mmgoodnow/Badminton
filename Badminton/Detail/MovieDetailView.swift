@@ -349,6 +349,9 @@ struct MovieDetailView: View {
     }
 
     private func creditsList(title: String, members: [TMDBCastMember]) -> some View {
+        let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let withPhoto = filtered.filter { hasProfileImage($0.profilePath) }
+        let withoutPhoto = filtered.filter { !hasProfileImage($0.profilePath) }
         return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
@@ -358,7 +361,7 @@ struct MovieDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -373,7 +376,7 @@ struct MovieDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -388,11 +391,16 @@ struct MovieDetailView: View {
                 }
             }
             #endif
+            if !withoutPhoto.isEmpty {
+                compactCreditsList(cast: withoutPhoto)
+            }
         }
     }
 
     private func creditsList(title: String, members: [TMDBCrewMember]) -> some View {
         let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let withPhoto = filtered.filter { hasProfileImage($0.profilePath) }
+        let withoutPhoto = filtered.filter { !hasProfileImage($0.profilePath) }
         return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
@@ -402,7 +410,7 @@ struct MovieDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -417,7 +425,7 @@ struct MovieDetailView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(filtered.enumerated()), id: \.offset) { _, member in
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
                     NavigationLink {
                         PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
                     } label: {
@@ -432,11 +440,83 @@ struct MovieDetailView: View {
                 }
             }
             #endif
+            if !withoutPhoto.isEmpty {
+                compactCreditsList(crew: withoutPhoto)
+            }
         }
     }
 
     private var gridColumns: [GridItem] {
         [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
+    }
+
+    private var compactCreditsColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 200), spacing: 12, alignment: .top)]
+    }
+
+    private func compactCreditsList(cast members: [TMDBCastMember]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("No photo")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            if let character = member.character, !character.isEmpty {
+                                Text(character)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func compactCreditsList(crew members: [TMDBCrewMember]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("No photo")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            if let job = member.job, !job.isEmpty {
+                                Text(job)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func hasProfileImage(_ path: String?) -> Bool {
+        guard let path else { return false }
+        return !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func infoStack(label: String, value: String) -> some View {

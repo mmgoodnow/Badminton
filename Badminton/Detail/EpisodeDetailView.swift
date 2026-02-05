@@ -156,36 +156,15 @@ struct EpisodeDetailView: View {
     private var creditsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             if !viewModel.castMembers.isEmpty {
-                creditsList(title: "Cast", members: viewModel.castMembers) { member in
-                    ListItemRow(
-                        title: member.name,
-                        subtitle: member.character ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath),
-                        showChevron: true
-                    )
-                }
+                creditsList(title: "Cast", members: viewModel.castMembers)
             }
 
             if !viewModel.guestStars.isEmpty {
-                creditsList(title: "Guests", members: viewModel.guestStars) { member in
-                    ListItemRow(
-                        title: member.name,
-                        subtitle: member.character ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath),
-                        showChevron: true
-                    )
-                }
+                creditsList(title: "Guests", members: viewModel.guestStars)
             }
 
             if !viewModel.crewMembers.isEmpty {
-                creditsList(title: "Crew", members: viewModel.crewMembers) { member in
-                    ListItemRow(
-                        title: member.name,
-                        subtitle: member.job ?? "",
-                        imageURL: viewModel.profileURL(path: member.profilePath),
-                        showChevron: true
-                    )
-                }
+                creditsList(title: "Crew", members: viewModel.crewMembers)
             }
 
             if viewModel.guestStars.isEmpty && viewModel.castMembers.isEmpty && viewModel.crewMembers.isEmpty {
@@ -196,12 +175,11 @@ struct EpisodeDetailView: View {
         }
     }
 
-    private func creditsList<T: Identifiable>(
-        title: String,
-        members: [T],
-        @ViewBuilder row: @escaping (T) -> some View
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func creditsList(title: String, members: [TMDBCastMember]) -> some View {
+        let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let withPhoto = filtered.filter { hasProfileImage($0.profilePath) }
+        let withoutPhoto = filtered.filter { !hasProfileImage($0.profilePath) }
+        return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
             #if os(macOS)
@@ -210,57 +188,88 @@ struct EpisodeDetailView: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
-                    if let cast = member as? TMDBCastMember {
-                        NavigationLink {
-                            PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
-                        } label: {
-                            ListPosterGridItem(
-                                title: cast.name,
-                                subtitle: cast.character ?? "",
-                                imageURL: viewModel.profileURL(path: cast.profilePath)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    } else if let crew = member as? TMDBCrewMember {
-                        NavigationLink {
-                            PersonDetailView(personID: crew.id, name: crew.name, profilePath: crew.profilePath)
-                        } label: {
-                            ListPosterGridItem(
-                                title: crew.name,
-                                subtitle: crew.job ?? "",
-                                imageURL: viewModel.profileURL(path: crew.profilePath)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        row(member)
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.character ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
-                    if let cast = member as? TMDBCastMember {
-                        NavigationLink {
-                            PersonDetailView(personID: cast.id, name: cast.name, profilePath: cast.profilePath)
-                        } label: {
-                            row(member)
-                        }
-                        .buttonStyle(.plain)
-                    } else if let crew = member as? TMDBCrewMember {
-                        NavigationLink {
-                            PersonDetailView(personID: crew.id, name: crew.name, profilePath: crew.profilePath)
-                        } label: {
-                            row(member)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        row(member)
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListItemRow(
+                            title: member.name,
+                            subtitle: member.character ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath),
+                            showChevron: true
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
             }
             #endif
+            if !withoutPhoto.isEmpty {
+                compactCreditsList(cast: withoutPhoto)
+            }
+        }
+    }
+
+    private func creditsList(title: String, members: [TMDBCrewMember]) -> some View {
+        let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let withPhoto = filtered.filter { hasProfileImage($0.profilePath) }
+        let withoutPhoto = filtered.filter { !hasProfileImage($0.profilePath) }
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            #if os(macOS)
+            LazyVGrid(
+                columns: gridColumns,
+                alignment: .leading,
+                spacing: 16
+            ) {
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListPosterGridItem(
+                            title: member.name,
+                            subtitle: member.job ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #else
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(withPhoto.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        ListItemRow(
+                            title: member.name,
+                            subtitle: member.job ?? "",
+                            imageURL: viewModel.profileURL(path: member.profilePath),
+                            showChevron: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            #endif
+            if !withoutPhoto.isEmpty {
+                compactCreditsList(crew: withoutPhoto)
+            }
         }
     }
 
@@ -280,6 +289,75 @@ struct EpisodeDetailView: View {
 
     private var gridColumns: [GridItem] {
         [GridItem(.adaptive(minimum: listItemStyle.rowPosterSize.width, maximum: listItemStyle.rowPosterSize.width), spacing: 16, alignment: .top)]
+    }
+
+    private var compactCreditsColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 200), spacing: 12, alignment: .top)]
+    }
+
+    private func compactCreditsList(cast members: [TMDBCastMember]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("No photo")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            if let character = member.character, !character.isEmpty {
+                                Text(character)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func compactCreditsList(crew members: [TMDBCrewMember]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("No photo")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: compactCreditsColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+                    NavigationLink {
+                        PersonDetailView(personID: member.id, name: member.name, profilePath: member.profilePath)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                            if let job = member.job, !job.isEmpty {
+                                Text(job)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func hasProfileImage(_ path: String?) -> Bool {
+        guard let path else { return false }
+        return !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func showLightbox(url: URL, title: String) {
