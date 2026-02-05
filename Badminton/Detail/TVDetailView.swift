@@ -93,10 +93,11 @@ struct TVDetailView: View {
                     .font(.title.bold())
                 if let detail = viewModel.detail {
                     if let tagline = detail.tagline, !tagline.isEmpty {
-                        taglineRow(tagline: tagline, genres: detail.genres)
-                    } else {
-                        genreChips(genres: detail.genres)
+                        Text(tagline)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    genreChips(genres: detail.genres)
                     quickFacts(detail: detail)
                 }
             }
@@ -133,18 +134,6 @@ struct TVDetailView: View {
     }
 
     @ViewBuilder
-    private func taglineRow(tagline: String, genres: [TMDBGenre]) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(tagline)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            if !genres.isEmpty {
-                inlineGenreChips(genres: genres)
-            }
-        }
-    }
-
-    @ViewBuilder
     private func genreChips(genres: [TMDBGenre]) -> some View {
         if !genres.isEmpty {
             #if os(iOS)
@@ -174,23 +163,6 @@ struct TVDetailView: View {
                 }
             }
             #endif
-        }
-    }
-
-    @ViewBuilder
-    private func inlineGenreChips(genres: [TMDBGenre]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(genres, id: \.id) { genre in
-                    Text(genre.name)
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.15))
-                        .clipShape(Capsule())
-                }
-            }
-            .padding(.trailing, 2)
         }
     }
 
