@@ -272,6 +272,9 @@ struct TVDetailView: View {
     }
 
     private var plexRequestState: PlexRequestState {
+        if overseerrLibraryIndex.isAvailable(tmdbID: tvID) {
+            return .available
+        }
         if overseerrRequest.isLoading {
             return .loading
         }
