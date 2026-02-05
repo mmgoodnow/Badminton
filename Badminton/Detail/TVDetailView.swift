@@ -678,7 +678,7 @@ struct TVDetailView: View {
 
     private func creditsList(title: String, members: [TMDBCrewMember]) -> some View {
         let filtered = members.filter { !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
             #if os(macOS)
