@@ -277,7 +277,11 @@ struct TVDetailView: View {
         return NavigationStack {
             List {
                 Section {
-                    if overseerrRequest.partialRequestsEnabled {
+                    if seasons.isEmpty {
+                        Text("No seasons available.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if overseerrRequest.partialRequestsEnabled {
                         ForEach(seasons, id: \.id) { season in
                             HStack(alignment: .center, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 4) {

@@ -155,8 +155,8 @@ struct EpisodeDetailView: View {
 
     private var creditsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !viewModel.guestStars.isEmpty {
-                creditsList(title: "Guests", members: Array(viewModel.guestStars.prefix(12))) { member in
+            if !viewModel.castMembers.isEmpty {
+                creditsList(title: "Cast", members: Array(viewModel.castMembers.prefix(12))) { member in
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
@@ -166,8 +166,8 @@ struct EpisodeDetailView: View {
                 }
             }
 
-            if !viewModel.castMembers.isEmpty {
-                creditsList(title: "Cast", members: Array(viewModel.castMembers.prefix(12))) { member in
+            if !viewModel.guestStars.isEmpty {
+                creditsList(title: "Guests", members: Array(viewModel.guestStars.prefix(12))) { member in
                     ListItemRow(
                         title: member.name,
                         subtitle: member.character ?? "",
