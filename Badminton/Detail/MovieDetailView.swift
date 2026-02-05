@@ -189,17 +189,22 @@ struct MovieDetailView: View {
     private var overseerrControls: some View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-                HStack(alignment: .firstTextBaseline) {
-                    infoStack(label: "Plex", value: overseerrRequest.statusText)
-                    Spacer(minLength: 12)
-                    if overseerrRequest.canRequest {
+                VStack(alignment: .leading, spacing: 8) {
+                    infoStack(
+                        label: "Plex",
+                        value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
+                    )
+                    if overseerrRequest.isLoading {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 120, height: 28)
+                            .redacted(reason: .placeholder)
+                    } else if overseerrRequest.canRequest {
                         let hasRequested = overseerrRequest.requestStatus != nil
                             || (overseerrRequest.mediaStatus != nil
                                 && overseerrRequest.mediaStatus != .unknown
                                 && overseerrRequest.mediaStatus != .deleted)
-                        let buttonTitle = overseerrRequest.isLoading
-                            ? "Requesting…"
-                            : (hasRequested ? "Requested" : "Request")
+                        let buttonTitle = hasRequested ? "Requested" : "Request"
                         Button(buttonTitle) {
                             Task {
                                 await overseerrRequest.request(
@@ -213,7 +218,7 @@ struct MovieDetailView: View {
                             }
                         }
                         .buttonStyle(.bordered)
-                        .disabled(overseerrRequest.isLoading || hasRequested)
+                        .disabled(hasRequested)
                     }
                 }
                 if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {

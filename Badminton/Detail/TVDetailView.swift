@@ -185,10 +185,17 @@ struct TVDetailView: View {
     private func overseerrControls(detail: TMDBTVSeriesDetail) -> some View {
         Group {
             if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-                HStack(alignment: .firstTextBaseline) {
-                    infoStack(label: "Plex", value: overseerrRequest.statusText)
-                    Spacer(minLength: 12)
-                    if overseerrRequest.canRequest {
+                VStack(alignment: .leading, spacing: 8) {
+                    infoStack(
+                        label: "Plex",
+                        value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
+                    )
+                    if overseerrRequest.isLoading {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 140, height: 28)
+                            .redacted(reason: .placeholder)
+                    } else if overseerrRequest.canRequest {
                         Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
                             let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
                             requestSeasons = seasons
@@ -199,7 +206,6 @@ struct TVDetailView: View {
                             isShowingOverseerrRequest = true
                         }
                         .buttonStyle(.bordered)
-                        .disabled(overseerrRequest.isLoading)
                     }
                 }
                 if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
