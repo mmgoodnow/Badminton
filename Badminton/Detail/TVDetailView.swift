@@ -117,7 +117,7 @@ struct TVDetailView: View {
                         .scaledToFill()
                 }
             }
-            .frame(width: 140, height: 210)
+            .frame(width: posterWidth, height: 210)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .onTapGesture {
                 if let url = viewModel.posterURL(path: viewModel.detail?.posterPath ?? posterPathFallback) {
@@ -206,15 +206,15 @@ struct TVDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.black)
-                .frame(width: 140)
                 .modifier(PlexStatusButtonStyle(filled: true))
+                .frame(width: posterWidth)
             } else {
                 Button(plexButtonTitle) { }
                     .buttonStyle(.plain)
                     .foregroundStyle(.primary)
                     .disabled(true)
-                    .frame(width: 140)
                     .modifier(PlexStatusButtonStyle(filled: false))
+                    .frame(width: posterWidth)
             }
         }
     }
@@ -234,6 +234,8 @@ struct TVDetailView: View {
         case requested
         case notRequested
     }
+
+    private var posterWidth: CGFloat { 140 }
 
     private var plexServerName: String {
         plexAuthManager.preferredServerName ?? "Plex"

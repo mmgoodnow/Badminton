@@ -212,15 +212,15 @@ struct MovieDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.black)
-                .frame(width: posterWidth)
                 .modifier(PlexStatusButtonStyle(filled: true))
+                .frame(width: posterWidth)
             } else {
                 Button(plexButtonTitle) { }
                     .buttonStyle(.plain)
                     .foregroundStyle(.primary)
                     .disabled(true)
-                    .frame(width: posterWidth)
                     .modifier(PlexStatusButtonStyle(filled: false))
+                    .frame(width: posterWidth)
             }
         }
     }
