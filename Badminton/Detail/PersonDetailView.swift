@@ -423,7 +423,18 @@ final class PersonDetailViewModel: ObservableObject {
         credits = Array(sorted.prefix(40))
         let knownForCandidates = sorted.filter { !isSelfRole($0) }
         let knownForSource = knownForCandidates.isEmpty ? sorted : knownForCandidates
-        knownFor = Array(knownForSource.prefix(12))
+        let knownForUnique = dedupeCredits(knownForSource)
+        knownFor = Array(knownForUnique.prefix(12))
+    }
+
+    private func dedupeCredits(_ credits: [TMDBMediaCredit]) -> [TMDBMediaCredit] {
+        var seen = Set<String>()
+        return credits.filter { credit in
+            let key = "\(credit.mediaType.rawValue):\(credit.id)"
+            guard !seen.contains(key) else { return false }
+            seen.insert(key)
+            return true
+        }
     }
 
     private func appearanceDate(for credit: TMDBMediaCredit) -> String? {
