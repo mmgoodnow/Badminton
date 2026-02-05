@@ -13,6 +13,7 @@ struct TVDetailView: View {
     @State private var lightboxItem: ImageLightboxItem?
     @State private var isShowingOverseerrRequest = false
     @State private var selectedSeasons: Set<Int> = []
+    @State private var requestSeasons: [TMDBTVSeasonSummary] = []
     @Environment(\.openURL) private var openURL
     @Environment(\.listItemStyle) private var listItemStyle
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
@@ -189,7 +190,9 @@ struct TVDetailView: View {
                     Spacer(minLength: 12)
                     if overseerrRequest.canRequest {
                         Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
-                            prepareSeasonSelection(from: detail.seasons)
+                            let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                            requestSeasons = seasons
+                            prepareSeasonSelection(from: seasons)
                             isShowingOverseerrRequest = true
                         }
                         .buttonStyle(.bordered)
@@ -273,7 +276,9 @@ struct TVDetailView: View {
     }
 
     private func overseerrRequestSheet(detail: TMDBTVSeriesDetail) -> some View {
-        let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+        let seasons = requestSeasons.isEmpty
+            ? detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+            : requestSeasons
         return NavigationStack {
             List {
                 Section {
