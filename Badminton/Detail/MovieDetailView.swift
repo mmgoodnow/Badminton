@@ -197,24 +197,31 @@ struct MovieDetailView: View {
     @ViewBuilder
     private var plexStatusButton: some View {
         if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-            Button(plexButtonTitle) {
-                guard plexRequestState == .notRequested else { return }
-                Task {
-                    await overseerrRequest.request(
-                        baseURL: overseerrAuthManager.baseURL,
-                        cookie: overseerrAuthManager.authCookie()
-                    )
-                    overseerrLibraryIndex.updateAvailability(
-                        tmdbID: movieID,
-                        status: overseerrRequest.mediaStatus
-                    )
+            if plexRequestState == .notRequested {
+                Button(plexButtonTitle) {
+                    Task {
+                        await overseerrRequest.request(
+                            baseURL: overseerrAuthManager.baseURL,
+                            cookie: overseerrAuthManager.authCookie()
+                        )
+                        overseerrLibraryIndex.updateAvailability(
+                            tmdbID: movieID,
+                            status: overseerrRequest.mediaStatus
+                        )
+                    }
                 }
+                .buttonStyle(BorderedProminentButtonStyle())
+                .tint(.yellow)
+                .foregroundStyle(.black)
+                .frame(width: 140)
+            } else {
+                Button(plexButtonTitle) { }
+                    .buttonStyle(BorderedButtonStyle())
+                    .tint(.yellow)
+                    .foregroundStyle(.primary)
+                    .disabled(true)
+                    .frame(width: 140)
             }
-            .buttonStyle(plexRequestState == .notRequested ? BorderedProminentButtonStyle() : BorderedButtonStyle())
-            .tint(.yellow)
-            .foregroundStyle(plexRequestState == .notRequested ? .black : .primary)
-            .disabled(plexRequestState != .notRequested)
-            .frame(width: 140)
         }
     }
 

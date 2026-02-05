@@ -193,21 +193,29 @@ struct TVDetailView: View {
     @ViewBuilder
     private var plexStatusButton: some View {
         if overseerrAuthManager.isAuthenticated && overseerrAuthManager.baseURL != nil {
-            Button(plexButtonTitle) {
-                guard plexRequestState == .notRequested, let detail = viewModel.detail else { return }
-                let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
-                requestSeasons = seasons
-                prepareSeasonSelection(from: seasons)
-                AppLog.overseerr.info(
-                    "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
-                )
-                isShowingOverseerrRequest = true
+            if plexRequestState == .notRequested {
+                Button(plexButtonTitle) {
+                    guard let detail = viewModel.detail else { return }
+                    let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                    requestSeasons = seasons
+                    prepareSeasonSelection(from: seasons)
+                    AppLog.overseerr.info(
+                        "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
+                    )
+                    isShowingOverseerrRequest = true
+                }
+                .buttonStyle(BorderedProminentButtonStyle())
+                .tint(.yellow)
+                .foregroundStyle(.black)
+                .frame(width: 140)
+            } else {
+                Button(plexButtonTitle) { }
+                    .buttonStyle(BorderedButtonStyle())
+                    .tint(.yellow)
+                    .foregroundStyle(.primary)
+                    .disabled(true)
+                    .frame(width: 140)
             }
-            .buttonStyle(plexRequestState == .notRequested ? BorderedProminentButtonStyle() : BorderedButtonStyle())
-            .tint(.yellow)
-            .foregroundStyle(plexRequestState == .notRequested ? .black : .primary)
-            .disabled(plexRequestState != .notRequested)
-            .frame(width: 140)
         }
     }
 
