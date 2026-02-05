@@ -319,7 +319,7 @@ struct MovieDetailView: View {
     }
 
     private func creditsList(title: String, members: [TMDBCastMember]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
             #if os(macOS)
