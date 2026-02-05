@@ -1629,7 +1629,7 @@ final class HomeViewModel: ObservableObject {
         return parts.last.map(String.init)
     }
 
-    private func limitRecentEpisodes(items: [PlexHistoryItem], limitPerShow: Int = 3) -> [PlexHistoryItem] {
+    private func limitRecentEpisodes(items: [PlexHistoryItem], limitPerShow: Int = 1) -> [PlexHistoryItem] {
         var episodeCounts: [String: Int] = [:]
         return items.filter { item in
             guard item.type?.lowercased() == "episode" else { return true }
