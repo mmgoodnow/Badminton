@@ -9,7 +9,7 @@ final class OverseerrLibraryIndex: ObservableObject {
 
     private let client: OverseerrAPIClient
     private let storage = OverseerrLibraryStore()
-    private let ttl: TimeInterval = 6 * 60 * 60
+    private let ttl: TimeInterval = 365 * 24 * 60 * 60
 
     init(client: OverseerrAPIClient = OverseerrAPIClient()) {
         self.client = client
