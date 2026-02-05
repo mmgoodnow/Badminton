@@ -12,9 +12,6 @@ struct SettingsView: View {
     @EnvironmentObject private var overseerrAuthManager: OverseerrAuthManager
     @StateObject private var plexServers = PlexServerListViewModel()
     @StateObject private var plexAccounts = PlexAccountListViewModel()
-#if os(iOS)
-    @StateObject private var liveActivity = PlaybackLiveActivityManager()
-#endif
     @State private var isSigningInTMDB = false
     @State private var tmdbErrorMessage: String?
 
@@ -25,9 +22,6 @@ struct SettingsView: View {
                     tmdbCard
                     plexCard
                     overseerrCard
-#if os(iOS)
-                    liveActivityCard
-#endif
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -191,32 +185,6 @@ struct SettingsView: View {
             }
         }
     }
-
-#if os(iOS)
-    private var liveActivityCard: some View {
-        settingsCard(
-            title: "Live Activity",
-            subtitle: "Debug controls for live activity previews.",
-            status: nil
-        ) {
-            Text(liveActivity.status)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                Button("Start") {
-                    liveActivity.startSample()
-                }
-                Button("Update") {
-                    liveActivity.updateSample()
-                }
-                Button("End") {
-                    liveActivity.endSample()
-                }
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-#endif
 
     @ViewBuilder
     private var serverPicker: some View {
