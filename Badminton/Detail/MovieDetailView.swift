@@ -260,11 +260,11 @@ struct MovieDetailView: View {
                 .padding(.horizontal, 10)
                 .frame(width: width)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(filled ? Color.yellow : Color.clear)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.yellow, lineWidth: 1.5)
                 )
         }
