@@ -190,23 +190,26 @@ struct TVDetailView: View {
                         label: "Plex",
                         value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
                     )
-                    if overseerrRequest.isLoading {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(width: 140, height: 28)
-                            .redacted(reason: .placeholder)
-                    } else if overseerrRequest.canRequest {
-                        Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
-                            let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
-                            requestSeasons = seasons
-                            prepareSeasonSelection(from: seasons)
-                            AppLog.overseerr.info(
-                                "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
-                            )
-                            isShowingOverseerrRequest = true
+                    ZStack(alignment: .leading) {
+                        if overseerrRequest.isLoading {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 140, height: 28)
+                                .redacted(reason: .placeholder)
+                        } else if overseerrRequest.canRequest {
+                            Button(overseerrRequest.partialRequestsEnabled ? "Request Seasons" : "Request Series") {
+                                let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
+                                requestSeasons = seasons
+                                prepareSeasonSelection(from: seasons)
+                                AppLog.overseerr.info(
+                                    "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
+                                )
+                                isShowingOverseerrRequest = true
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
                     }
+                    .frame(height: 30, alignment: .leading)
                 }
                 if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
                     Text(errorMessage)

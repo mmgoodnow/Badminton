@@ -194,32 +194,35 @@ struct MovieDetailView: View {
                         label: "Plex",
                         value: overseerrRequest.isLoading ? "Loading…" : overseerrRequest.statusText
                     )
-                    if overseerrRequest.isLoading {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(width: 120, height: 28)
-                            .redacted(reason: .placeholder)
-                    } else if overseerrRequest.canRequest {
-                        let hasRequested = overseerrRequest.requestStatus != nil
-                            || (overseerrRequest.mediaStatus != nil
-                                && overseerrRequest.mediaStatus != .unknown
-                                && overseerrRequest.mediaStatus != .deleted)
-                        let buttonTitle = hasRequested ? "Requested" : "Request"
-                        Button(buttonTitle) {
-                            Task {
-                                await overseerrRequest.request(
-                                    baseURL: overseerrAuthManager.baseURL,
-                                    cookie: overseerrAuthManager.authCookie()
-                                )
-                                overseerrLibraryIndex.updateAvailability(
-                                    tmdbID: movieID,
-                                    status: overseerrRequest.mediaStatus
-                                )
+                    ZStack(alignment: .leading) {
+                        if overseerrRequest.isLoading {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 120, height: 28)
+                                .redacted(reason: .placeholder)
+                        } else if overseerrRequest.canRequest {
+                            let hasRequested = overseerrRequest.requestStatus != nil
+                                || (overseerrRequest.mediaStatus != nil
+                                    && overseerrRequest.mediaStatus != .unknown
+                                    && overseerrRequest.mediaStatus != .deleted)
+                            let buttonTitle = hasRequested ? "Requested" : "Request"
+                            Button(buttonTitle) {
+                                Task {
+                                    await overseerrRequest.request(
+                                        baseURL: overseerrAuthManager.baseURL,
+                                        cookie: overseerrAuthManager.authCookie()
+                                    )
+                                    overseerrLibraryIndex.updateAvailability(
+                                        tmdbID: movieID,
+                                        status: overseerrRequest.mediaStatus
+                                    )
+                                }
                             }
+                            .buttonStyle(.bordered)
+                            .disabled(hasRequested)
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(hasRequested)
                     }
+                    .frame(height: 30, alignment: .leading)
                 }
                 if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
                     Text(errorMessage)
