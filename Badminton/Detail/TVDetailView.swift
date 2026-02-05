@@ -193,6 +193,9 @@ struct TVDetailView: View {
                             let seasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
                             requestSeasons = seasons
                             prepareSeasonSelection(from: seasons)
+                            AppLog.overseerr.info(
+                                "TV request sheet open id=\(tvID, privacy: .public) seasons=\(seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
+                            )
                             isShowingOverseerrRequest = true
                         }
                         .buttonStyle(.bordered)
@@ -327,6 +330,9 @@ struct TVDetailView: View {
                 if requestSeasons.isEmpty && !detail.seasons.isEmpty {
                     requestSeasons = detail.seasons.sorted { $0.seasonNumber > $1.seasonNumber }
                 }
+                AppLog.overseerr.info(
+                    "TV request sheet appear id=\(tvID, privacy: .public) requestSeasons=\(requestSeasons.count, privacy: .public) detailSeasons=\(detail.seasons.count, privacy: .public) partial=\(overseerrRequest.partialRequestsEnabled, privacy: .public) selected=\(selectedSeasons.count, privacy: .public)"
+                )
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
