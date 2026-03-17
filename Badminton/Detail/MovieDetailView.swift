@@ -115,6 +115,7 @@ struct MovieDetailView: View {
                 }
             }
             plexStatusButton
+            letterboxdButton
             if let errorMessage = overseerrRequest.errorMessage, !errorMessage.isEmpty {
                 Text(errorMessage)
                     .font(.footnote)
@@ -251,6 +252,18 @@ struct MovieDetailView: View {
                     .modifier(PlexStatusButtonStyle(filled: false, width: posterWidth))
             }
         }
+    }
+
+    private var letterboxdButton: some View {
+        Button {
+            openURL(Letterboxd.movieURL(tmdbID: movieID))
+        } label: {
+            Label("Letterboxd", systemImage: "arrow.up.forward.square")
+                .frame(width: posterWidth)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help("Open this movie on Letterboxd")
     }
 
     private enum PlexRequestState {
@@ -637,4 +650,14 @@ final class MovieDetailViewModel: ObservableObject {
     }
     .environmentObject(OverseerrAuthManager())
     .environmentObject(OverseerrLibraryIndex())
+}
+
+private enum Letterboxd {
+    private static let baseURL = URL(string: "https://letterboxd.com")!
+
+    static func movieURL(tmdbID: Int) -> URL {
+        baseURL
+            .appendingPathComponent("tmdb")
+            .appendingPathComponent(String(tmdbID))
+    }
 }
