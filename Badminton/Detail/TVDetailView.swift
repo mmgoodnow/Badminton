@@ -464,6 +464,11 @@ struct TVDetailView: View {
                                 baseURL: overseerrAuthManager.baseURL,
                                 cookie: overseerrAuthManager.authCookie()
                             )
+                            if overseerrRequest.needsAuthenticationReconnect {
+                                overseerrAuthManager.expireSession()
+                                isShowingOverseerrRequest = false
+                                return
+                            }
                             overseerrLibraryIndex.updateAvailability(
                                 tmdbID: tvID,
                                 status: overseerrRequest.mediaStatus
@@ -497,6 +502,10 @@ struct TVDetailView: View {
             baseURL: overseerrAuthManager.baseURL,
             cookie: overseerrAuthManager.authCookie()
         )
+        if overseerrRequest.needsAuthenticationReconnect {
+            overseerrAuthManager.expireSession()
+            return
+        }
         overseerrLibraryIndex.updateAvailability(
             tmdbID: tvID,
             status: overseerrRequest.mediaStatus

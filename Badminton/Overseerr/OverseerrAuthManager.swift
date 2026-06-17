@@ -39,7 +39,7 @@ final class OverseerrAuthManager: ObservableObject {
     func signIn(plexToken: String?) async {
         errorMessage = nil
         guard let baseURL else {
-            errorMessage = "Enter your Overseerr URL first."
+            errorMessage = "Enter your Seerr URL first."
             return
         }
         guard let plexToken, !plexToken.isEmpty else {
@@ -63,6 +63,11 @@ final class OverseerrAuthManager: ObservableObject {
 
     func signOut() {
         clearSession()
+    }
+
+    func expireSession() {
+        clearSession()
+        errorMessage = "Reconnect Seerr in Settings."
     }
 
     func authCookie() -> String? {

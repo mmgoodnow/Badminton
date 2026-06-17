@@ -122,8 +122,8 @@ struct SettingsView: View {
 
     private var overseerrCard: some View {
         settingsCard(
-            title: "Overseerr",
-            subtitle: "Connect Overseerr to request movies and shows from Badminton.",
+            title: "Seerr",
+            subtitle: "Connect Seerr to request movies and shows from Badminton.",
             status: overseerrStatus
         ) {
             settingsSubcard(title: "Server") {
@@ -147,12 +147,12 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Button("Disconnect Overseerr", role: .destructive) {
+                Button("Disconnect Seerr", role: .destructive) {
                     overseerrAuthManager.signOut()
                 }
                 .buttonStyle(.bordered)
             } else {
-                Button(overseerrAuthManager.isAuthenticating ? "Connecting…" : "Connect Overseerr") {
+                Button(overseerrAuthManager.isAuthenticating ? "Connecting…" : "Connect Seerr") {
                     Task { await overseerrAuthManager.signIn(plexToken: plexAuthManager.authToken) }
                 }
                 .buttonStyle(.borderedProminent)
@@ -160,7 +160,7 @@ struct SettingsView: View {
             }
 
             if overseerrAuthManager.isAuthenticating {
-                ProgressView("Waiting for Overseerr…")
+                ProgressView("Waiting for Seerr…")
             }
 
             if let errorMessage = overseerrAuthManager.errorMessage {
@@ -168,7 +168,7 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
             } else if !plexAuthManager.isAuthenticated {
-                Text("Connect Plex first to authenticate with Overseerr.")
+                Text("Connect Plex first to authenticate with Seerr.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -235,6 +235,10 @@ struct MovieDetailView: View {
                             baseURL: overseerrAuthManager.baseURL,
                             cookie: overseerrAuthManager.authCookie()
                         )
+                        if overseerrRequest.needsAuthenticationReconnect {
+                            overseerrAuthManager.expireSession()
+                            return
+                        }
                         overseerrLibraryIndex.updateAvailability(
                             tmdbID: movieID,
                             status: overseerrRequest.mediaStatus
@@ -343,6 +347,10 @@ struct MovieDetailView: View {
             baseURL: overseerrAuthManager.baseURL,
             cookie: overseerrAuthManager.authCookie()
         )
+        if overseerrRequest.needsAuthenticationReconnect {
+            overseerrAuthManager.expireSession()
+            return
+        }
         overseerrLibraryIndex.updateAvailability(
             tmdbID: movieID,
             status: overseerrRequest.mediaStatus

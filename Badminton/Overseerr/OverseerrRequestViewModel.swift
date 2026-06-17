@@ -9,6 +9,7 @@ final class OverseerrRequestViewModel: ObservableObject {
     @Published private(set) var seasonStatuses: [Int: OverseerrMediaStatus] = [:]
     @Published private(set) var partialRequestsEnabled: Bool = false
     @Published private(set) var isLoading = false
+    @Published private(set) var needsAuthenticationReconnect = false
     @Published var errorMessage: String?
 
     private let client: OverseerrAPIClient
@@ -29,6 +30,7 @@ final class OverseerrRequestViewModel: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        needsAuthenticationReconnect = false
 
         do {
             async let settings = client.getPublicSettings(baseURL: baseURL)
@@ -38,6 +40,9 @@ final class OverseerrRequestViewModel: ObservableObject {
             partialRequestsEnabled = settingsResponse.partialRequestsEnabled
             apply(mediaInfoResponse)
         } catch is CancellationError {
+        } catch let error as OverseerrAPIError where error.isAuthenticationRequired {
+            needsAuthenticationReconnect = true
+            errorMessage = error.localizedDescription
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -47,18 +52,22 @@ final class OverseerrRequestViewModel: ObservableObject {
 
     func request(seasons: [Int]? = nil, baseURL: URL?, cookie: String?) async {
         guard let baseURL, let cookie else {
-            errorMessage = "Connect Overseerr first."
+            errorMessage = "Connect Seerr first."
             return
         }
 
         isLoading = true
         errorMessage = nil
+        needsAuthenticationReconnect = false
 
         do {
             let body = OverseerrRequestBody(mediaType: mediaType, mediaId: tmdbID, seasons: seasons?.isEmpty == true ? nil : seasons)
             _ = try await client.requestMedia(baseURL: baseURL, body: body, cookie: cookie)
             await load(baseURL: baseURL, cookie: cookie)
         } catch is CancellationError {
+        } catch let error as OverseerrAPIError where error.isAuthenticationRequired {
+            needsAuthenticationReconnect = true
+            errorMessage = error.localizedDescription
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -118,6 +127,7 @@ final class OverseerrRequestViewModel: ObservableObject {
         mediaStatus = nil
         seasonStatuses = [:]
         partialRequestsEnabled = false
+        needsAuthenticationReconnect = false
         errorMessage = nil
         isLoading = false
     }

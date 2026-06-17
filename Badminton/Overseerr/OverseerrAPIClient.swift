@@ -136,6 +136,10 @@ struct OverseerrAPIClient {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             if let errorResponse = try? decoder.decode(OverseerrErrorResponse.self, from: data) {
+                if (httpResponse.statusCode == 401 || httpResponse.statusCode == 403),
+                   errorResponse.isEndpointPermissionError {
+                    throw OverseerrAPIError.authenticationRequired
+                }
                 if let message = errorResponse.message, !message.isEmpty {
                     throw OverseerrAPIError.server(message)
                 }
@@ -184,6 +188,10 @@ struct OverseerrUser: Decodable {
 struct OverseerrErrorResponse: Decodable {
     let message: String?
     let error: String?
+
+    var isEndpointPermissionError: Bool {
+        error == "You do not have permission to access this endpoint"
+    }
 }
 
 enum OverseerrAPIError: LocalizedError {
@@ -191,23 +199,33 @@ enum OverseerrAPIError: LocalizedError {
     case invalidResponse
     case httpStatus(Int)
     case server(String)
+    case authenticationRequired
     case network(host: String, code: URLError.Code)
     case missingSessionCookie
+
+    var isAuthenticationRequired: Bool {
+        if case .authenticationRequired = self {
+            return true
+        }
+        return false
+    }
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid Overseerr URL."
+            return "Invalid Seerr URL."
         case .invalidResponse:
-            return "Invalid response from Overseerr."
+            return "Invalid response from Seerr."
         case .httpStatus(let code):
-            return "Overseerr returned status code \(code)."
+            return "Seerr returned status code \(code)."
         case .server(let message):
             return message
+        case .authenticationRequired:
+            return "Reconnect Seerr in Settings."
         case .network(let host, let code):
             return "Network error (\(code.rawValue)) while contacting \(host)."
         case .missingSessionCookie:
-            return "Overseerr did not return a session cookie."
+            return "Seerr did not return a session cookie."
         }
     }
 }

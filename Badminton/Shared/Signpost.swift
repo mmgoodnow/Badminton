@@ -5,13 +5,13 @@ enum SignpostLog {
     static let subsystem = "com.bebopbeluga.Badminton"
     static let navigation = OSLog(subsystem: subsystem, category: "Navigation")
     static let tmdb = OSLog(subsystem: subsystem, category: "TMDB")
-    static let overseerr = OSLog(subsystem: subsystem, category: "Overseerr")
+    static let overseerr = OSLog(subsystem: subsystem, category: "Seerr")
 }
 
 enum AppLog {
     static let navigation = Logger(subsystem: SignpostLog.subsystem, category: "Navigation")
     static let tmdb = Logger(subsystem: SignpostLog.subsystem, category: "TMDB")
-    static let overseerr = Logger(subsystem: SignpostLog.subsystem, category: "Overseerr")
+    static let overseerr = Logger(subsystem: SignpostLog.subsystem, category: "Seerr")
 }
 
 struct SignpostInterval {
