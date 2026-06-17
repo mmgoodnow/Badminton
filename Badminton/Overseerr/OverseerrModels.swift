@@ -11,7 +11,14 @@ enum OverseerrMediaStatus: Int, Decodable {
     case processing = 3
     case partiallyAvailable = 4
     case available = 5
-    case deleted = 6
+    case blocklisted = 6
+    case deleted = 7
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(Int.self)
+        self = OverseerrMediaStatus(rawValue: rawValue) ?? .unknown
+    }
 
     var displayText: String {
         switch self {
@@ -25,6 +32,8 @@ enum OverseerrMediaStatus: Int, Decodable {
             return "Partial"
         case .available:
             return "Available"
+        case .blocklisted:
+            return "Blocklisted"
         case .deleted:
             return "Deleted"
         }

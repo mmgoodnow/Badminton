@@ -269,6 +269,7 @@ struct MovieDetailView: View {
     private enum PlexRequestState {
         case loading
         case available
+        case blocklisted
         case requested
         case notRequested
     }
@@ -285,6 +286,8 @@ struct MovieDetailView: View {
             return "Checking Plex…"
         case .available:
             return "Available · \(plexServerName)"
+        case .blocklisted:
+            return "Blocklisted · \(plexServerName)"
         case .requested:
             return "Requested · \(plexServerName)"
         case .notRequested:
@@ -322,6 +325,9 @@ struct MovieDetailView: View {
         }
         if overseerrRequest.mediaStatus == .available {
             return .available
+        }
+        if overseerrRequest.mediaStatus == .blocklisted {
+            return .blocklisted
         }
         if overseerrRequest.requestStatus != nil {
             return .requested

@@ -77,6 +77,8 @@ final class OverseerrRequestViewModel: ObservableObject {
             return false
         case .partiallyAvailable:
             return mediaType == .tv
+        case .blocklisted:
+            return false
         case .unknown, .pending, .processing, .deleted:
             return true
         }
