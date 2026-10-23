@@ -239,7 +239,7 @@ struct MovieDetailView: View {
                             return
                         }
                         overseerrLibraryIndex.updateAvailability(
-                            tmdbID: movieID,
+                            tmdbID: movieID, mediaType: .movie,
                             status: overseerrRequest.mediaStatus
                         )
                     }
@@ -320,7 +320,7 @@ struct MovieDetailView: View {
     }
 
     private var plexRequestState: PlexRequestState {
-        if overseerrLibraryIndex.isAvailable(tmdbID: movieID) {
+        if overseerrLibraryIndex.isAvailable(tmdbID: movieID, mediaType: .movie) {
             return .available
         }
         if overseerrRequest.isLoading {
@@ -350,7 +350,7 @@ struct MovieDetailView: View {
             return
         }
         overseerrLibraryIndex.updateAvailability(
-            tmdbID: movieID,
+            tmdbID: movieID, mediaType: .movie,
             status: overseerrRequest.mediaStatus
         )
     }

@@ -96,6 +96,11 @@ struct SettingsView: View {
                 settingsSubcard {
                     accountPicker
                 }
+                Button(plexAuthManager.isAuthenticating ? "Reconnecting…" : "Reconnect Plex") {
+                    Task { await plexAuthManager.signIn() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(plexAuthManager.isAuthenticating)
                 Button("Disconnect Plex", role: .destructive) {
                     plexAuthManager.signOut()
                 }

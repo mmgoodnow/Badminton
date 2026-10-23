@@ -1,115 +1,118 @@
 import Combine
+import CryptoKit
 import Foundation
+import os
+
+struct OverseerrMediaKey: Codable, Hashable {
+    let tmdbID: Int
+    let mediaType: OverseerrMediaType
+}
 
 @MainActor
 final class OverseerrLibraryIndex: ObservableObject {
-    @Published private(set) var availableTMDBIDs: Set<Int>
+    @Published private(set) var availableMedia: Set<OverseerrMediaKey> = []
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isRefreshing = false
+    @Published private(set) var errorMessage: String?
 
     private let client: OverseerrAPIClient
-    private let storage = OverseerrLibraryStore()
+    private let defaults: UserDefaults
+    private let cacheKey = "overseerr.library.v2"
+    private var scope: String?
+    private var generation = UUID()
     private let ttl: TimeInterval = 6 * 60 * 60
 
-    init(client: OverseerrAPIClient = OverseerrAPIClient()) {
+    init(client: OverseerrAPIClient = OverseerrAPIClient(), defaults: UserDefaults = .standard) {
         self.client = client
-        let cachedIDs = storage.readIDs()
-        self.availableTMDBIDs = Set(cachedIDs)
-        self.lastUpdated = storage.readLastUpdated()
+        self.defaults = defaults
     }
 
-    func isAvailable(tmdbID: Int) -> Bool {
-        availableTMDBIDs.contains(tmdbID)
+    func isAvailable(tmdbID: Int, mediaType: OverseerrMediaType) -> Bool {
+        availableMedia.contains(OverseerrMediaKey(tmdbID: tmdbID, mediaType: mediaType))
     }
 
-    func refreshIfNeeded(baseURL: URL?, cookie: String?) async {
-        guard let lastUpdated else {
-            await refresh(baseURL: baseURL, cookie: cookie, force: true)
+    func refreshIfNeeded(authManager: OverseerrAuthManager, plexToken: String?) async {
+        await refresh(authManager: authManager, plexToken: plexToken)
+    }
+
+    func refresh(authManager: OverseerrAuthManager, plexToken: String?, force: Bool = false) async {
+        guard let baseURL = authManager.baseURL, let cookie = authManager.authCookie() else {
+            reset(scope: nil)
             return
         }
-        let elapsed = Date().timeIntervalSince(lastUpdated)
-        guard elapsed >= ttl else { return }
-        await refresh(baseURL: baseURL, cookie: cookie, force: true)
-    }
-
-    func refresh(baseURL: URL?, cookie: String?, force: Bool = false) async {
+        // Scope cached availability to the server and signed-in session, without persisting the cookie.
+        let newScope = SHA256.hash(data: Data((baseURL.absoluteString + "|" + cookie).utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        if scope != newScope {
+            reset(scope: newScope)
+            if let data = defaults.data(forKey: cacheKey),
+               let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data), snapshot.scope == newScope {
+                availableMedia = snapshot.media
+                lastUpdated = snapshot.updated
+            }
+        }
         guard !isRefreshing else { return }
-        guard let baseURL, let cookie else { return }
-        if !force, let lastUpdated, Date().timeIntervalSince(lastUpdated) < ttl {
-            return
-        }
-
+        if !force, let lastUpdated, Date().timeIntervalSince(lastUpdated) < ttl { return }
+        let requestGeneration = generation
         isRefreshing = true
-        defer { isRefreshing = false }
-
-        var allIDs: Set<Int> = []
-        let pageSize = 100
-        var currentPage = 1
-        var totalPages = 1
-
+        errorMessage = nil
+        defer { if generation == requestGeneration { isRefreshing = false } }
         do {
-            while currentPage <= totalPages {
-                let response = try await client.getMediaPage(
-                    baseURL: baseURL,
-                    filter: "allavailable",
-                    take: pageSize,
-                    skip: (currentPage - 1) * pageSize,
-                    cookie: cookie
-                )
-                totalPages = response.pageInfo.pages
-                for item in response.results {
-                    allIDs.insert(item.tmdbId)
+            let allMedia = try await authManager.withSession(plexToken: plexToken) { url, cookie in
+                var media: Set<OverseerrMediaKey> = []
+                var page = 1
+                var totalPages = 1
+                while page <= totalPages {
+                    try Task.checkCancellation()
+                    let response = try await self.client.getMediaPage(baseURL: url, filter: "allavailable",
+                        take: 100, skip: (page - 1) * 100, cookie: cookie)
+                    totalPages = response.pageInfo.pages
+                    for item in response.results {
+                        media.insert(OverseerrMediaKey(tmdbID: item.tmdbId, mediaType: item.mediaType))
+                    }
+                    page += 1
                 }
-                currentPage += 1
+                return media
             }
-
-            availableTMDBIDs = allIDs
+            try Task.checkCancellation()
+            guard generation == requestGeneration else { return }
+            availableMedia = allMedia
             lastUpdated = Date()
-            storage.save(ids: Array(allIDs))
-            storage.saveLastUpdated(lastUpdated)
+            save()
+        } catch is CancellationError {
         } catch {
+            guard generation == requestGeneration else { return }
+            errorMessage = error.localizedDescription
+            AppLog.overseerr.error("Library availability refresh failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    func updateAvailability(tmdbID: Int, status: OverseerrMediaStatus?) {
-        guard let status else { return }
-        let isAvailable = status == .available || status == .partiallyAvailable
-        if isAvailable {
-            if !availableTMDBIDs.contains(tmdbID) {
-                availableTMDBIDs.insert(tmdbID)
-                storage.save(ids: Array(availableTMDBIDs))
-            }
-        } else if availableTMDBIDs.contains(tmdbID) {
-            availableTMDBIDs.remove(tmdbID)
-            storage.save(ids: Array(availableTMDBIDs))
-        }
-    }
-}
-
-private struct OverseerrLibraryStore {
-    private enum Key {
-        static let availableIDs = "overseerr.library.available.tmdb"
-        static let lastUpdated = "overseerr.library.available.updated"
+    func updateAvailability(tmdbID: Int, mediaType: OverseerrMediaType, status: OverseerrMediaStatus?) {
+        guard let status, scope != nil else { return }
+        let key = OverseerrMediaKey(tmdbID: tmdbID, mediaType: mediaType)
+        if status == .available || status == .partiallyAvailable { availableMedia.insert(key) }
+        else { availableMedia.remove(key) }
+        save()
     }
 
-    func save(ids: [Int]) {
-        if let data = try? JSONEncoder().encode(ids) {
-            UserDefaults.standard.set(data, forKey: Key.availableIDs)
-        }
+    private func reset(scope: String?) {
+        generation = UUID()
+        self.scope = scope
+        availableMedia = []
+        lastUpdated = nil
+        isRefreshing = false
+        errorMessage = nil
     }
 
-    func readIDs() -> [Int] {
-        guard let data = UserDefaults.standard.data(forKey: Key.availableIDs),
-              let ids = try? JSONDecoder().decode([Int].self, from: data)
-        else { return [] }
-        return ids
+    private func save() {
+        guard let scope, let lastUpdated,
+              let data = try? JSONEncoder().encode(Snapshot(scope: scope, media: availableMedia, updated: lastUpdated)) else { return }
+        defaults.set(data, forKey: cacheKey)
     }
 
-    func saveLastUpdated(_ date: Date?) {
-        UserDefaults.standard.set(date, forKey: Key.lastUpdated)
-    }
-
-    func readLastUpdated() -> Date? {
-        UserDefaults.standard.object(forKey: Key.lastUpdated) as? Date
+    private struct Snapshot: Codable {
+        let scope: String
+        let media: Set<OverseerrMediaKey>
+        let updated: Date
     }
 }

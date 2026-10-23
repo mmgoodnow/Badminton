@@ -302,7 +302,7 @@ struct TVDetailView: View {
     }
 
     private var plexRequestState: PlexRequestState {
-        if overseerrLibraryIndex.isAvailable(tmdbID: tvID) {
+        if overseerrLibraryIndex.isAvailable(tmdbID: tvID, mediaType: .tv) {
             return .available
         }
         if overseerrRequest.isLoading {
@@ -469,7 +469,7 @@ struct TVDetailView: View {
                                 return
                             }
                             overseerrLibraryIndex.updateAvailability(
-                                tmdbID: tvID,
+                                tmdbID: tvID, mediaType: .tv,
                                 status: overseerrRequest.mediaStatus
                             )
                             isShowingOverseerrRequest = false
@@ -505,7 +505,7 @@ struct TVDetailView: View {
             return
         }
         overseerrLibraryIndex.updateAvailability(
-            tmdbID: tvID,
+            tmdbID: tvID, mediaType: .tv,
             status: overseerrRequest.mediaStatus
         )
     }

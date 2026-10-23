@@ -1,6 +1,6 @@
 import Foundation
 
-enum OverseerrMediaType: String, Encodable {
+enum OverseerrMediaType: String, Codable, Hashable {
     case movie
     case tv
 }
@@ -112,6 +112,7 @@ struct OverseerrPageInfo: Decodable {
 
 struct OverseerrMediaItem: Decodable {
     let tmdbId: Int
+    let mediaType: OverseerrMediaType
 }
 
 struct OverseerrMediaPage: Decodable {

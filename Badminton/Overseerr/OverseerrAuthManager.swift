@@ -49,7 +49,12 @@ final class OverseerrAuthManager: ObservableObject {
     func withSession<T>(plexToken: String?, operation: (URL, String) async throws -> T) async throws -> T {
         guard let baseURL, let cookie = sessionCookie else { throw OverseerrAPIError.authenticationRequired }
         let generation = sessionGeneration
-        do { return try await operation(baseURL, cookie) }
+        do {
+            let result = try await operation(baseURL, cookie)
+            try Task.checkCancellation()
+            guard generation == sessionGeneration else { throw CancellationError() }
+            return result
+        }
         catch let error as OverseerrAPIError where error.isAuthenticationRequired {
             guard generation == sessionGeneration else { throw CancellationError() }
             // Concurrent reads share one login. A caller with an old cookie uses the renewed one.
@@ -58,7 +63,10 @@ final class OverseerrAuthManager: ObservableObject {
             }
             try Task.checkCancellation()
             guard generation == sessionGeneration, let renewed = sessionCookie else { throw CancellationError() }
-            return try await operation(baseURL, renewed)
+            let result = try await operation(baseURL, renewed)
+            try Task.checkCancellation()
+            guard generation == sessionGeneration else { throw CancellationError() }
+            return result
         }
     }
 

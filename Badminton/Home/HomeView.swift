@@ -121,23 +121,10 @@ struct HomeView: View {
                     )
                 }
             }
-            .task {
-                await viewModel.load()
+            .task { await viewModel.load() }
+            .task(id: overseerrAuthManager.baseURLString + "|" + String(overseerrAuthManager.isAuthenticated)) {
                 await overseerrLibraryIndex.refreshIfNeeded(
-                    baseURL: overseerrAuthManager.baseURL,
-                    cookie: overseerrAuthManager.authCookie()
-                )
-            }
-            .task(id: overseerrAuthManager.isAuthenticated) {
-                await overseerrLibraryIndex.refreshIfNeeded(
-                    baseURL: overseerrAuthManager.baseURL,
-                    cookie: overseerrAuthManager.authCookie()
-                )
-            }
-            .task(id: overseerrAuthManager.baseURLString) {
-                await overseerrLibraryIndex.refreshIfNeeded(
-                    baseURL: overseerrAuthManager.baseURL,
-                    cookie: overseerrAuthManager.authCookie()
+                    authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
                 )
             }
             .task(id: PlexLoadIdentity(token: plexAuthManager.authToken,
@@ -169,8 +156,7 @@ struct HomeView: View {
                         preferredAccountIDs: plexAuthManager.preferredAccountIDs
                     )
                     await overseerrLibraryIndex.refreshIfNeeded(
-                        baseURL: overseerrAuthManager.baseURL,
-                        cookie: overseerrAuthManager.authCookie()
+                        authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
                     )
                 }
             }
@@ -204,8 +190,7 @@ struct HomeView: View {
             force: force
         )
         async let library: Void = overseerrLibraryIndex.refresh(
-            baseURL: overseerrAuthManager.baseURL,
-            cookie: overseerrAuthManager.authCookie(),
+            authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken,
             force: force
         )
         _ = await (discovery, plex, library)
@@ -374,7 +359,7 @@ struct HomeView: View {
                                 title: item.displayTitle,
                                 subtitle: item.subtitle,
                                 imageURL: viewModel.posterURL(path: item.posterPath),
-                                showDogEar: overseerrLibraryIndex.isAvailable(tmdbID: item.id)
+                                showDogEar: overseerrLibraryIndex.isAvailable(tmdbID: item.id, mediaType: item.mediaType)
                             )
                         }
                         .buttonStyle(.plain)
@@ -461,6 +446,13 @@ struct HomeView: View {
 private enum HomeMediaItem {
     case movie(TMDBMovieSummary)
     case tv(TMDBTVSeriesSummary)
+
+    var mediaType: OverseerrMediaType {
+        switch self {
+        case .movie: return .movie
+        case .tv: return .tv
+        }
+    }
 
     var id: Int {
         switch self {

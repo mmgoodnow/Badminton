@@ -131,6 +131,74 @@ struct BadmintonTests {
         #expect(model.plexNowPlaying.count == 1)
         #expect(model.plexErrorMessage?.hasPrefix("History:") == true)
         #expect(!model.plexIsLoading)
+        await model.loadPlexHistory(token: nil, preferredServerID: nil, preferredAccountIDs: [])
+        session.invalidateAndCancel()
+    }
+
+    @Test func availabilitySeparatesMoviesAndTVAndClearsOnDisconnect() async throws {
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        defaults.set("https://seerr.test", forKey: "overseerr.base.url")
+        defaults.set("connect.sid=test", forKey: "overseerr.session.cookie")
+        let session = session { _ in
+            (200, [:], "{\"pageInfo\":{\"pages\":1,\"page\":1,\"results\":1,\"pageSize\":100},\"results\":[{\"tmdbId\":42,\"mediaType\":\"movie\"}]}")
+        }
+        let auth = OverseerrAuthManager(client: OverseerrAPIClient(session: session), defaults: defaults)
+        let index = OverseerrLibraryIndex(client: OverseerrAPIClient(session: session), defaults: defaults)
+        await index.refresh(authManager: auth, plexToken: nil)
+        #expect(index.isAvailable(tmdbID: 42, mediaType: .movie))
+        #expect(!index.isAvailable(tmdbID: 42, mediaType: .tv))
+        auth.signOut()
+        await index.refresh(authManager: auth, plexToken: nil)
+        #expect(index.availableMedia.isEmpty)
+        #expect(index.lastUpdated == nil)
+        session.invalidateAndCancel()
+    }
+
+    @Test func transientPlexFailurePreservesPreviouslyLoadedRail() async throws {
+        var fail = false
+        let session = session { request in
+            if request.url!.host == "clients.plex.tv" { return (200, [:], Self.resources) }
+            if fail { throw URLError(.cannotConnectToHost) }
+            return (200, [:], "{\"MediaContainer\":{\"Metadata\":[{\"ratingKey\":\"42\",\"type\":\"movie\",\"title\":\"Test\",\"thumb\":\"/thumb\"}]}}")
+        }
+        let model = HomeViewModel(plexClient: PlexAPIClient(session: session))
+        await model.loadPlexHistory(token: "account", preferredServerID: "selected", preferredAccountIDs: [])
+        #expect(model.plexNowPlaying.count == 1)
+        fail = true
+        await model.loadPlexHistory(token: "account", preferredServerID: "selected", preferredAccountIDs: [], force: true)
+        #expect(model.plexNowPlaying.count == 1)
+        #expect(model.plexErrorMessage != nil)
+        await model.loadPlexHistory(token: nil, preferredServerID: nil, preferredAccountIDs: [])
+        session.invalidateAndCancel()
+    }
+
+    @Test func concurrentSeerrReadsShareOneRenewal() async throws {
+        let defaults = UserDefaults(suiteName: UUID().uuidString)!
+        defaults.set("https://seerr.test", forKey: "overseerr.base.url")
+        defaults.set("connect.sid=old", forKey: "overseerr.session.cookie")
+        var logins = 0
+        let session = session { request in
+            if request.url!.path.hasSuffix("/auth/plex") {
+                logins += 1
+                return (200, ["Set-Cookie": "connect.sid=new; Path=/"], "{\"id\":1}")
+            }
+            if request.value(forHTTPHeaderField: "Cookie") == "connect.sid=new" {
+                return (200, [:], "{\"mediaInfo\":{\"status\":5}}")
+            }
+            return (403, [:], "{\"error\":\"You do not have permission to access this endpoint\"}")
+        }
+        let client = OverseerrAPIClient(session: session)
+        let auth = OverseerrAuthManager(client: client, defaults: defaults)
+        async let first = auth.withSession(plexToken: "plex") { url, cookie in
+            try await client.getMovie(baseURL: url, tmdbID: 1, cookie: cookie)
+        }
+        async let second = auth.withSession(plexToken: "plex") { url, cookie in
+            try await client.getTV(baseURL: url, tmdbID: 2, cookie: cookie)
+        }
+        let responses = try await (first, second)
+        #expect(responses.0.mediaInfo?.status == .available)
+        #expect(responses.1.mediaInfo?.status == .available)
+        #expect(logins == 1)
         session.invalidateAndCancel()
     }
 

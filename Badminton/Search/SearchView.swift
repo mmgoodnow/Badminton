@@ -115,6 +115,8 @@ final class SearchViewModel: ObservableObject {
 
     private let client: TMDBAPIClient
     private var cancellables = Set<AnyCancellable>()
+    private var searchTask: Task<Void, Never>?
+    private var searchGeneration = UUID()
     private let historyKey = "tmdb.search.history"
 
     init(client: TMDBAPIClient = TMDBAPIClient()) {
@@ -125,20 +127,25 @@ final class SearchViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(350), scheduler: DispatchQueue.main)
             .sink { [weak self] value in
-                Task { await self?.search(query: value) }
+                self?.searchTask?.cancel()
+                self?.searchTask = Task { await self?.search(query: value) }
             }
             .store(in: &cancellables)
     }
 
     func search(query: String) async {
+        guard query == self.query else { return }
+        let generation = UUID()
+        searchGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             results = []
+            isSearching = false
             return
         }
 
         isSearching = true
-        defer { isSearching = false }
+        defer { if generation == searchGeneration { isSearching = false } }
 
         do {
             let response: TMDBPagedResults<TMDBSearchResultItem> = try await client.getV3(
@@ -148,10 +155,13 @@ final class SearchViewModel: ObservableObject {
                     URLQueryItem(name: "include_adult", value: "false"),
                 ]
             )
-            guard query == self.query else { return }
+            try Task.checkCancellation()
+            guard query == self.query, generation == searchGeneration else { return }
             results = response.results
             addToHistory(trimmed)
+        } catch is CancellationError {
         } catch {
+            guard query == self.query, generation == searchGeneration else { return }
             results = []
         }
     }

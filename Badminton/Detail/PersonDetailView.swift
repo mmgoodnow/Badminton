@@ -296,7 +296,7 @@ struct PersonDetailView: View {
 
     private func hasDogEar(for credit: TMDBMediaCredit) -> Bool {
         guard credit.mediaType == .movie || credit.mediaType == .tv else { return false }
-        return overseerrLibraryIndex.isAvailable(tmdbID: credit.id)
+        return overseerrLibraryIndex.isAvailable(tmdbID: credit.id, mediaType: credit.mediaType == .movie ? .movie : .tv)
     }
 }
 

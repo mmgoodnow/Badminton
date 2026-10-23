@@ -70,6 +70,7 @@ final class PlexAPIClient {
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
 
+        try Task.checkCancellation()
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -106,6 +107,7 @@ final class PlexAPIClient {
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
 
+        try Task.checkCancellation()
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -153,6 +155,7 @@ final class PlexAPIClient {
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
 
+        try Task.checkCancellation()
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             if let http = response as? HTTPURLResponse, [401, 403].contains(http.statusCode) {
@@ -244,6 +247,7 @@ final class PlexAPIClient {
         request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+        try Task.checkCancellation()
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
