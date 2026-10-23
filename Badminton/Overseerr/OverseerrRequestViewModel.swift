@@ -22,8 +22,8 @@ final class OverseerrRequestViewModel: ObservableObject {
         self.client = client
     }
 
-    func load(baseURL: URL?, cookie: String?) async {
-        guard let baseURL, let cookie else {
+    func load(authManager: OverseerrAuthManager, plexToken: String?) async {
+        guard authManager.isAuthenticated else {
             resetState()
             return
         }
@@ -33,12 +33,15 @@ final class OverseerrRequestViewModel: ObservableObject {
         needsAuthenticationReconnect = false
 
         do {
-            async let settings = client.getPublicSettings(baseURL: baseURL)
-            async let mediaInfo: OverseerrMediaInfo? = fetchMediaInfo(baseURL: baseURL, cookie: cookie)
-
-            let (settingsResponse, mediaInfoResponse) = try await (settings, mediaInfo)
-            partialRequestsEnabled = settingsResponse.partialRequestsEnabled
-            apply(mediaInfoResponse)
+            let mediaInfo = try await authManager.withSession(plexToken: plexToken) { baseURL, cookie in
+                try await self.fetchMediaInfo(baseURL: baseURL, cookie: cookie)
+            }
+            apply(mediaInfo)
+            // Settings are optional; failure must not hide successfully loaded request status.
+            if let baseURL = authManager.baseURL,
+               let settings = try? await client.getPublicSettings(baseURL: baseURL) {
+                partialRequestsEnabled = settings.partialRequestsEnabled
+            }
         } catch is CancellationError {
         } catch let error as OverseerrAPIError where error.isAuthenticationRequired {
             needsAuthenticationReconnect = true
@@ -50,8 +53,8 @@ final class OverseerrRequestViewModel: ObservableObject {
         isLoading = false
     }
 
-    func request(seasons: [Int]? = nil, baseURL: URL?, cookie: String?) async {
-        guard let baseURL, let cookie else {
+    func request(seasons: [Int]? = nil, authManager: OverseerrAuthManager, plexToken: String?) async {
+        guard authManager.isAuthenticated else {
             errorMessage = "Connect Seerr first."
             return
         }
@@ -62,8 +65,10 @@ final class OverseerrRequestViewModel: ObservableObject {
 
         do {
             let body = OverseerrRequestBody(mediaType: mediaType, mediaId: tmdbID, seasons: seasons?.isEmpty == true ? nil : seasons)
-            _ = try await client.requestMedia(baseURL: baseURL, body: body, cookie: cookie)
-            await load(baseURL: baseURL, cookie: cookie)
+            _ = try await authManager.withSession(plexToken: plexToken) { baseURL, cookie in
+                try await self.client.requestMedia(baseURL: baseURL, body: body, cookie: cookie)
+            }
+            await load(authManager: authManager, plexToken: plexToken)
         } catch is CancellationError {
         } catch let error as OverseerrAPIError where error.isAuthenticationRequired {
             needsAuthenticationReconnect = true
@@ -88,7 +93,9 @@ final class OverseerrRequestViewModel: ObservableObject {
             return mediaType == .tv
         case .blocklisted:
             return false
-        case .unknown, .pending, .processing, .deleted:
+        case .pending, .processing:
+            return mediaType == .tv
+        case .unknown, .deleted:
             return true
         }
     }

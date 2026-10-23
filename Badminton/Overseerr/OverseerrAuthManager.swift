@@ -17,14 +17,18 @@ final class OverseerrAuthManager: ObservableObject {
     @Published private(set) var userDisplayName: String?
     @Published var errorMessage: String?
 
+    private var renewalTask: Task<(user: OverseerrUser, cookie: String), Error>?
+    private var sessionGeneration = UUID()
+
     private let client: OverseerrAPIClient
-    private let storage = OverseerrTokenStore()
+    private let storage: OverseerrTokenStore
     private var sessionCookie: String? {
         didSet { storage.save(sessionCookie, for: .sessionCookie) }
     }
 
-    init(client: OverseerrAPIClient = OverseerrAPIClient()) {
+    init(client: OverseerrAPIClient = OverseerrAPIClient(), defaults: UserDefaults = .standard) {
         self.client = client
+        self.storage = OverseerrTokenStore(defaults: defaults)
         let storedBaseURL = storage.read(.baseURL) ?? ""
         self.baseURLString = storedBaseURL
         self.sessionCookie = storage.read(.sessionCookie)
@@ -38,26 +42,49 @@ final class OverseerrAuthManager: ObservableObject {
 
     func signIn(plexToken: String?) async {
         errorMessage = nil
-        guard let baseURL else {
-            errorMessage = "Enter your Seerr URL first."
-            return
-        }
-        guard let plexToken, !plexToken.isEmpty else {
-            errorMessage = "Connect Plex first."
-            return
-        }
+        do { try await renewSession(plexToken: plexToken) }
+        catch { errorMessage = error.localizedDescription }
+    }
 
+    func withSession<T>(plexToken: String?, operation: (URL, String) async throws -> T) async throws -> T {
+        guard let baseURL, let cookie = sessionCookie else { throw OverseerrAPIError.authenticationRequired }
+        let generation = sessionGeneration
+        do { return try await operation(baseURL, cookie) }
+        catch let error as OverseerrAPIError where error.isAuthenticationRequired {
+            guard generation == sessionGeneration else { throw CancellationError() }
+            // Concurrent reads share one login. A caller with an old cookie uses the renewed one.
+            if sessionCookie == cookie {
+                try await renewSession(plexToken: plexToken)
+            }
+            try Task.checkCancellation()
+            guard generation == sessionGeneration, let renewed = sessionCookie else { throw CancellationError() }
+            return try await operation(baseURL, renewed)
+        }
+    }
+
+    private func renewSession(plexToken: String?) async throws {
+        guard let baseURL else { throw OverseerrAPIError.invalidURL }
+        guard let plexToken, !plexToken.isEmpty else { throw OverseerrAPIError.authenticationRequired }
+        let generation = sessionGeneration
         isAuthenticating = true
         defer { isAuthenticating = false }
-
+        let task: Task<(user: OverseerrUser, cookie: String), Error>
+        if let renewalTask { task = renewalTask }
+        else {
+            task = Task { try await client.signInWithPlex(baseURL: baseURL, plexToken: plexToken) }
+            renewalTask = task
+        }
         do {
-            let response = try await client.signInWithPlex(baseURL: baseURL, plexToken: plexToken)
+            let response = try await task.value
+            guard generation == sessionGeneration else { throw CancellationError() }
+            renewalTask = nil
             sessionCookie = response.cookie
             userDisplayName = response.user.displayName ?? response.user.plexUsername ?? response.user.username
             storage.save(userDisplayName, for: .userDisplayName)
             isAuthenticated = true
         } catch {
-            errorMessage = error.localizedDescription
+            if generation == sessionGeneration { renewalTask = nil }
+            throw error
         }
     }
 
@@ -75,6 +102,9 @@ final class OverseerrAuthManager: ObservableObject {
     }
 
     private func clearSession() {
+        sessionGeneration = UUID()
+        renewalTask?.cancel()
+        renewalTask = nil
         sessionCookie = nil
         userDisplayName = nil
         storage.delete(.sessionCookie)
@@ -84,6 +114,7 @@ final class OverseerrAuthManager: ObservableObject {
 }
 
 private struct OverseerrTokenStore {
+    let defaults: UserDefaults
     enum Key: String {
         case baseURL = "overseerr.base.url"
         case sessionCookie = "overseerr.session.cookie"
@@ -95,14 +126,14 @@ private struct OverseerrTokenStore {
             delete(key)
             return
         }
-        UserDefaults.standard.set(value, forKey: key.rawValue)
+        defaults.set(value, forKey: key.rawValue)
     }
 
     func read(_ key: Key) -> String? {
-        UserDefaults.standard.string(forKey: key.rawValue)
+        defaults.string(forKey: key.rawValue)
     }
 
     func delete(_ key: Key) {
-        UserDefaults.standard.removeObject(forKey: key.rawValue)
+        defaults.removeObject(forKey: key.rawValue)
     }
 }

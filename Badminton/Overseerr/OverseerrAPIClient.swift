@@ -15,6 +15,8 @@ struct OverseerrAPIClient {
         let body = OverseerrPlexAuthRequest(authToken: plexToken)
         let url = try makeURL(baseURL: baseURL, path: "/auth/plex")
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -25,6 +27,10 @@ struct OverseerrAPIClient {
             throw OverseerrAPIError.missingSessionCookie
         }
         return (response.value, cookie)
+    }
+
+    func getCurrentUser(baseURL: URL, cookie: String) async throws -> OverseerrUser {
+        try await get(baseURL: baseURL, path: "/auth/me", cookie: cookie)
     }
 
     func getPublicSettings(baseURL: URL) async throws -> OverseerrPublicSettings {
@@ -76,6 +82,8 @@ struct OverseerrAPIClient {
             url = withQuery
         }
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        request.timeoutInterval = 15
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let cookie {
@@ -93,6 +101,8 @@ struct OverseerrAPIClient {
     ) async throws -> T {
         let url = try makeURL(baseURL: baseURL, path: path)
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
+        request.timeoutInterval = 15
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -135,15 +145,33 @@ struct OverseerrAPIClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 { throw OverseerrAPIError.authenticationRequired }
+            if httpResponse.statusCode == 403,
+               let cookie = request.value(forHTTPHeaderField: "Cookie"),
+               let url = request.url, !url.path.hasSuffix("/auth/me") {
+                // Seerr uses the same 403 for expired sessions and real permission denials.
+                // Check the session before deciding whether reconnecting will help.
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                if let range = components?.path.range(of: "/api/v1/") {
+                    components?.path = String(url.path[..<range.lowerBound]) + "/api/v1/auth/me"
+                    components?.query = nil
+                    if let meURL = components?.url {
+                        var check = URLRequest(url: meURL)
+                        check.httpShouldHandleCookies = false
+                        check.timeoutInterval = 15
+                        check.setValue(cookie, forHTTPHeaderField: "Cookie")
+                        let (_, response) = try await session.data(for: check)
+                        if let http = response as? HTTPURLResponse, [401, 403].contains(http.statusCode) {
+                            throw OverseerrAPIError.authenticationRequired
+                        }
+                    }
+                }
+            }
+            if httpResponse.statusCode == 403, request.url?.path.hasSuffix("/auth/me") == true {
+                throw OverseerrAPIError.authenticationRequired
+            }
             if let errorResponse = try? decoder.decode(OverseerrErrorResponse.self, from: data) {
-                if (httpResponse.statusCode == 401 || httpResponse.statusCode == 403),
-                   errorResponse.isEndpointPermissionError {
-                    throw OverseerrAPIError.authenticationRequired
-                }
-                if let message = errorResponse.message, !message.isEmpty {
-                    throw OverseerrAPIError.server(message)
-                }
-                if let message = errorResponse.error, !message.isEmpty {
+                if let message = errorResponse.message ?? errorResponse.error, !message.isEmpty {
                     throw OverseerrAPIError.server(message)
                 }
             }
@@ -189,9 +217,6 @@ struct OverseerrErrorResponse: Decodable {
     let message: String?
     let error: String?
 
-    var isEndpointPermissionError: Bool {
-        error == "You do not have permission to access this endpoint"
-    }
 }
 
 enum OverseerrAPIError: LocalizedError {

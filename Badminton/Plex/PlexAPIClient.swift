@@ -1,9 +1,14 @@
 import Foundation
 
+@MainActor
 final class PlexAPIClient {
     private let session: URLSession
+    private var resourcesTask: Task<PlexResourcesResponse, Error>?
+    private var resourcesToken: String?
+    private var resourcesDate: Date?
+    private var workingConnections: [String: URL] = [:]
 
-    init(session: URLSession = .shared) {
+    nonisolated init(session: URLSession = .shared) {
         self.session = session
     }
 
@@ -59,6 +64,7 @@ final class PlexAPIClient {
         ]
         let url = components?.url ?? URL(string: "https://plex.tv/api/v2/home/users")!
         var request = URLRequest(url: url)
+        request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
@@ -113,8 +119,23 @@ final class PlexAPIClient {
     }
 
     private func fetchResources(token: String) async throws -> PlexResourcesResponse {
-        let (data, _) = try await requestResourcesData(token: token)
-        return try JSONDecoder().decode(PlexResourcesResponse.self, from: data)
+        if resourcesToken != token || resourcesDate.map({ Date().timeIntervalSince($0) > 300 }) == true {
+            resourcesTask = nil
+            workingConnections = [:]
+        }
+        if let resourcesTask { return try await resourcesTask.value }
+        resourcesToken = token
+        resourcesDate = Date()
+        let task = Task {
+            let (data, _) = try await requestResourcesData(token: token)
+            return try JSONDecoder().decode(PlexResourcesResponse.self, from: data)
+        }
+        resourcesTask = task
+        do { return try await task.value }
+        catch {
+            if resourcesToken == token { resourcesTask = nil }
+            throw error
+        }
     }
 
     private func requestResourcesData(token: String) async throws -> (data: Data, response: HTTPURLResponse) {
@@ -126,6 +147,7 @@ final class PlexAPIClient {
         ]
         let url = components?.url ?? URL(string: "https://clients.plex.tv/api/v2/resources")!
         var request = URLRequest(url: url)
+        request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
@@ -133,168 +155,105 @@ final class PlexAPIClient {
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            if let http = response as? HTTPURLResponse, [401, 403].contains(http.statusCode) {
+                throw PlexAPIError.authenticationRequired
+            }
             throw URLError(.badServerResponse)
         }
         return (data, http)
     }
 
-    private func selectServer(from response: PlexResourcesResponse, preferredServerID: String?) -> PlexServerCandidate? {
-        let devices = response.devices
-        let servers = devices.filter { $0.provides?.contains("server") == true }
-        if let preferredServerID,
-           let preferred = servers.first(where: { $0.clientIdentifier == preferredServerID }),
-           let connection = bestConnection(from: preferred.connections) {
-            return PlexServerCandidate(baseURL: connection, accessToken: preferred.accessToken)
-        }
-        for device in servers {
-            if let connection = bestConnection(from: device.connections) {
-                return PlexServerCandidate(baseURL: connection, accessToken: device.accessToken)
-            }
-        }
-        return nil
+    private func requestHistoryData(token: String, size: Int, preferredServerID: String?) async throws -> PlexServerResponse {
+        let oneMonthAgo = Int(Date().addingTimeInterval(-30 * 24 * 60 * 60).timeIntervalSince1970)
+        return try await requestServerData(token: token, preferredServerID: preferredServerID,
+            path: "status/sessions/history/all", queryItems: [
+                URLQueryItem(name: "sort", value: "viewedAt:desc"),
+                URLQueryItem(name: "X-Plex-Container-Start", value: "0"),
+                URLQueryItem(name: "X-Plex-Container-Size", value: String(size)),
+                URLQueryItem(name: "viewedAt>", value: String(oneMonthAgo))
+            ])
     }
 
-    private func bestConnection(from connections: [PlexConnection]?) -> URL? {
-        let candidates = connections ?? []
-        let nonRelay = candidates.filter { !$0.isRelay && $0.uri != nil }
-        let plexDirect = nonRelay.filter { $0.isPlexDirect }
+    private func requestMetadataData(ratingKey: String, token: String, preferredServerID: String?) async throws -> PlexServerResponse {
+        try await requestServerData(token: token, preferredServerID: preferredServerID,
+            path: "library/metadata/\(ratingKey)", queryItems: [URLQueryItem(name: "includeGuids", value: "1")])
+    }
 
-        func pickBest(from list: [PlexConnection]) -> URL? {
-            if let remoteSecure = list.first(where: { !$0.isLocal && $0.isSecure }) {
-                return remoteSecure.uri
+    private func requestSessionsData(token: String, preferredServerID: String?) async throws -> PlexServerResponse {
+        try await requestServerData(token: token, preferredServerID: preferredServerID, path: "status/sessions")
+    }
+
+    private func requestServerData(token: String, preferredServerID: String?, path: String,
+                                   queryItems: [URLQueryItem] = []) async throws -> PlexServerResponse {
+        guard let preferredServerID, !preferredServerID.isEmpty else { throw PlexAPIError.noSelectedServer }
+        let resources = try await fetchResources(token: token)
+        try Task.checkCancellation()
+        guard let server = resources.devices.first(where: {
+            $0.clientIdentifier == preferredServerID && $0.provides?.contains("server") == true
+        }) else { throw PlexAPIError.selectedServerUnavailable }
+        let serverToken = server.accessToken ?? token
+        let urls = Array(Set((server.connections ?? []).compactMap(\.uri)))
+        guard !urls.isEmpty else { throw PlexAPIError.selectedServerUnavailable }
+
+        if let cached = workingConnections[preferredServerID], urls.contains(cached) {
+            do {
+                return try await Self.readServer(session: session, baseURL: cached, token: serverToken,
+                                                 path: path, queryItems: queryItems)
+            } catch {
+                try Task.checkCancellation()
+                workingConnections[preferredServerID] = nil
+                print("Plex cached connection failed; trying other addresses for selected server")
             }
-            if let remote = list.first(where: { !$0.isLocal }) {
-                return remote.uri
-            }
-            if let localSecure = list.first(where: { $0.isLocal && $0.isSecure }) {
-                return localSecure.uri
-            }
-            if let local = list.first(where: { $0.isLocal }) {
-                return local.uri
-            }
-            return list.first?.uri
         }
 
-        let selected = pickBest(from: plexDirect)
-            ?? pickBest(from: nonRelay)
-            ?? candidates.first(where: { $0.uri != nil })?.uri
+        // Race actual GETs: every address belongs to the explicitly selected server.
+        // A dead remote or LAN address cannot delay a reachable connection.
+        let session = session
+        let result = try await withThrowingTaskGroup(of: PlexServerResponse?.self) { group in
+            for url in urls {
+                group.addTask {
+                    try? await Self.readServer(session: session, baseURL: url, token: serverToken,
+                                               path: path, queryItems: queryItems)
+                }
+            }
+            for try await response in group {
+                if let response {
+                    group.cancelAll()
+                    return response
+                }
+            }
+            try Task.checkCancellation()
+            throw PlexAPIError.selectedServerUnavailable
+        }
+        workingConnections[preferredServerID] = result.serverBaseURL
         if PlexConfig.logConnectionSelection {
-            if let selected, let connection = candidates.first(where: { $0.uri == selected }) {
-                print("Plex selected connection: \(selected) local=\(connection.isLocal) relay=\(connection.isRelay) plexDirect=\(connection.isPlexDirect) ipv6=\(connection.isIPv6Address)")
-            } else if let selected {
-                print("Plex selected connection: \(selected)")
-            }
+            print("Plex connected to selected server via \(result.serverBaseURL.host ?? "unknown")")
         }
-        return selected
+        return result
     }
 
-    private func requestHistoryData(token: String, size: Int, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
-        let resourceResponse = try await fetchResources(token: token)
-        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
-            throw URLError(.cannotFindHost)
-        }
-
-        let serverToken = server.accessToken ?? token
-        let serverURL = server.baseURL
-        let start = 0
-        let oneMonthAgoDate = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date().addingTimeInterval(-30 * 24 * 60 * 60)
-        let oneMonthAgo = Int(oneMonthAgoDate.timeIntervalSince1970)
-
-        var components = URLComponents()
-        components.queryItems = [
-            URLQueryItem(name: "sort", value: "viewedAt:desc"),
-            URLQueryItem(name: "X-Plex-Container-Start", value: "\(start)"),
-            URLQueryItem(name: "X-Plex-Container-Size", value: "\(size)"),
-            URLQueryItem(name: "X-Plex-Token", value: serverToken),
-            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
-            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
-        ]
-        var encodedQuery = components.percentEncodedQuery ?? ""
-        if !encodedQuery.isEmpty {
-            encodedQuery.append("&")
-        }
-        encodedQuery.append("viewedAt>=\(oneMonthAgo)")
-        let baseURLString = serverURL.appendingPathComponent("status/sessions/history/all").absoluteString
-        let rawURLString = "\(baseURLString)?\(encodedQuery)"
-        let fallbackURLString = rawURLString.replacingOccurrences(of: "viewedAt>=", with: "viewedAt%3E%3D=")
-        let url = URL(string: rawURLString)
-            ?? URL(string: fallbackURLString)
-            ?? serverURL.appendingPathComponent("status/sessions/history/all")
+    private static func readServer(session: URLSession, baseURL: URL, token: String,
+                                   path: String, queryItems: [URLQueryItem]) async throws -> PlexServerResponse {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)
+        components?.queryItems = queryItems.isEmpty ? nil : queryItems
+        guard let url = components?.url else { throw URLError(.badURL) }
         var request = URLRequest(url: url)
-        request.timeoutInterval = 12
+        request.timeoutInterval = 6
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
+        request.setValue(token, forHTTPHeaderField: "X-Plex-Token")
         request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-        request.setValue("\(start)", forHTTPHeaderField: "X-Plex-Container-Start")
-        request.setValue("\(size)", forHTTPHeaderField: "X-Plex-Container-Size")
-
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
-        return (data, http, serverURL, serverToken)
-    }
-
-    private func requestMetadataData(ratingKey: String, token: String, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
-        let resourceResponse = try await fetchResources(token: token)
-        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
-            throw URLError(.cannotFindHost)
-        }
-
-        let serverToken = server.accessToken ?? token
-        let serverURL = server.baseURL
-        var components = URLComponents(url: serverURL.appendingPathComponent("library/metadata/\(ratingKey)"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [
-            URLQueryItem(name: "includeGuids", value: "1"),
-            URLQueryItem(name: "X-Plex-Token", value: serverToken),
-            URLQueryItem(name: "X-Plex-Client-Identifier", value: PlexConfig.clientIdentifier),
-            URLQueryItem(name: "X-Plex-Product", value: PlexConfig.productName)
-        ]
-        let url = components?.url ?? serverURL.appendingPathComponent("library/metadata/\(ratingKey)")
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 12
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
-        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
-        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        return (data, http, serverURL, serverToken)
-    }
-
-    private func requestSessionsData(token: String, preferredServerID: String?) async throws -> (data: Data, response: HTTPURLResponse, serverBaseURL: URL, serverToken: String) {
-        let resourceResponse = try await fetchResources(token: token)
-        guard let server = selectServer(from: resourceResponse, preferredServerID: preferredServerID) else {
-            throw URLError(.cannotFindHost)
-        }
-
-        let serverToken = server.accessToken ?? token
-        let serverURL = server.baseURL
-        let url = serverURL.appendingPathComponent("status/sessions")
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 12
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(serverToken, forHTTPHeaderField: "X-Plex-Token")
-        request.setValue(PlexConfig.productName, forHTTPHeaderField: "X-Plex-Product")
-        request.setValue(PlexConfig.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
-        return (data, http, serverURL, serverToken)
+        return PlexServerResponse(data: data, response: http, serverBaseURL: baseURL, serverToken: token)
     }
 
     private func parseHistoryItems(from data: Data, limit: Int) async throws -> [PlexHistoryItem] {
-        try await Task.detached(priority: .userInitiated) {
-            let decoder = JSONDecoder()
-            let response = try decoder.decode(PlexHistoryResponse.self, from: data)
-            return response.items
-        }.value
+        let response = try JSONDecoder().decode(PlexHistoryResponse.self, from: data)
+        return limit > 0 ? Array(response.items.prefix(limit)) : response.items
     }
 }
 
@@ -316,9 +275,25 @@ struct PlexResourcesRawResult {
     let response: HTTPURLResponse
 }
 
-private struct PlexServerCandidate {
-    let baseURL: URL
-    let accessToken: String?
+private struct PlexServerResponse {
+    let data: Data
+    let response: HTTPURLResponse
+    let serverBaseURL: URL
+    let serverToken: String
+}
+
+enum PlexAPIError: LocalizedError {
+    case authenticationRequired
+    case noSelectedServer
+    case selectedServerUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .authenticationRequired: return "Reconnect Plex in Settings; its saved connection is no longer authorized."
+        case .noSelectedServer: return "Choose a Plex server in Settings."
+        case .selectedServerUnavailable: return "The selected Plex server is unavailable. Check its connection or retry."
+        }
+    }
 }
 
 private struct PlexResourcesResponse: Decodable {

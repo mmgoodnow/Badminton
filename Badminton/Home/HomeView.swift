@@ -140,21 +140,9 @@ struct HomeView: View {
                     cookie: overseerrAuthManager.authCookie()
                 )
             }
-            .task(id: plexAuthManager.authToken) {
-                await viewModel.loadPlexHistory(
-                    token: plexAuthManager.authToken,
-                    preferredServerID: plexAuthManager.preferredServerID,
-                    preferredAccountIDs: plexAuthManager.preferredAccountIDs
-                )
-            }
-            .task(id: plexAuthManager.preferredServerID) {
-                await viewModel.loadPlexHistory(
-                    token: plexAuthManager.authToken,
-                    preferredServerID: plexAuthManager.preferredServerID,
-                    preferredAccountIDs: plexAuthManager.preferredAccountIDs
-                )
-            }
-            .task(id: plexAuthManager.preferredAccountIDs) {
+            .task(id: PlexLoadIdentity(token: plexAuthManager.authToken,
+                                       serverID: plexAuthManager.preferredServerID,
+                                       accountIDs: plexAuthManager.preferredAccountIDs)) {
                 await viewModel.loadPlexHistory(
                     token: plexAuthManager.authToken,
                     preferredServerID: plexAuthManager.preferredServerID,
@@ -208,18 +196,19 @@ struct HomeView: View {
 
     @MainActor
     private func refreshAll(force: Bool) async {
-        await viewModel.load(force: force)
-        await viewModel.loadPlexHistory(
+        async let discovery: Void = viewModel.load(force: force)
+        async let plex: Void = viewModel.loadPlexHistory(
             token: plexAuthManager.authToken,
             preferredServerID: plexAuthManager.preferredServerID,
             preferredAccountIDs: plexAuthManager.preferredAccountIDs,
             force: force
         )
-        await overseerrLibraryIndex.refresh(
+        async let library: Void = overseerrLibraryIndex.refresh(
             baseURL: overseerrAuthManager.baseURL,
             cookie: overseerrAuthManager.authCookie(),
             force: force
         )
+        _ = await (discovery, plex, library)
     }
 
     private var searchResultsSection: some View {
@@ -256,6 +245,18 @@ struct HomeView: View {
                 let recent = viewModel.plexRecent
                 let hasItems = !nowPlaying.isEmpty || !recent.isEmpty
 
+                if let error = viewModel.plexErrorMessage {
+                    HStack {
+                        Text(error).font(.callout).foregroundStyle(.secondary)
+                        Button("Retry") {
+                            Task {
+                                await viewModel.loadPlexHistory(token: plexAuthManager.authToken,
+                                    preferredServerID: plexAuthManager.preferredServerID,
+                                    preferredAccountIDs: plexAuthManager.preferredAccountIDs, force: true)
+                            }
+                        }
+                    }
+                }
                 if viewModel.plexIsLoading && !hasItems {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 24) {
@@ -725,6 +726,12 @@ private struct PlexPosterSkeleton: View {
     }
 }
 
+private struct PlexLoadIdentity: Hashable {
+    let token: String?
+    let serverID: String?
+    let accountIDs: Set<Int>
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var trendingMovies: [TMDBMovieSummary] = []
@@ -736,6 +743,9 @@ final class HomeViewModel: ObservableObject {
     @Published var popularPeople: [TMDBPersonSummary] = []
     @Published var plexNowPlaying: [PlexRecentlyWatchedItem] = []
     @Published var plexRecent: [PlexRecentlyWatchedItem] = []
+    @Published var plexErrorMessage: String?
+    private var plexLoadGeneration = UUID()
+    private var plexLastLoaded: Date?
     @Published var plexIsLoading = false
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -825,6 +835,10 @@ final class HomeViewModel: ObservableObject {
         force: Bool = false
     ) async {
         guard let token, !token.isEmpty else {
+            plexLoadGeneration = UUID()
+            plexIsLoading = false
+            plexErrorMessage = nil
+            clearPlexResolutionCache()
             plexNowPlaying = []
             plexRecent = []
             plexTokenLoaded = nil
@@ -841,21 +855,43 @@ final class HomeViewModel: ObservableObject {
             guard plexTokenLoaded != token
                 || plexPreferredServerLoaded != preferredServerID
                 || plexPreferredAccountLoaded != preferredAccountIDs
+                || plexLastLoaded.map({ Date().timeIntervalSince($0) > 60 }) != false
                 || (plexNowPlaying.isEmpty && plexRecent.isEmpty)
             else { return }
         }
 
+        let generation = UUID()
+        plexLoadGeneration = generation
+        if plexTokenLoaded != token || plexPreferredServerLoaded != preferredServerID
+            || plexPreferredAccountLoaded != preferredAccountIDs {
+            clearPlexResolutionCache()
+            plexRecent = []
+            plexNowPlaying = []
+        }
         plexIsLoading = true
+        plexErrorMessage = nil
+        defer { if generation == plexLoadGeneration { plexIsLoading = false } }
         do {
-            let result = try await plexClient.fetchRecentlyWatched(
-                token: token,
-                size: 500,
-                preferredServerID: preferredServerID
-            )
-            let nowPlayingResult = try? await plexClient.fetchNowPlaying(
-                token: token,
-                preferredServerID: preferredServerID
-            )
+            async let history = plexResult { try await self.plexClient.fetchRecentlyWatched(
+                token: token, size: 500, preferredServerID: preferredServerID) }
+            async let playing = plexResult { try await self.plexClient.fetchNowPlaying(
+                token: token, preferredServerID: preferredServerID) }
+            let (historyResult, playingResult) = await (history, playing)
+            try Task.checkCancellation()
+            guard generation == plexLoadGeneration else { return }
+            let nowPlayingResult = try? playingResult.get()
+            let result: PlexHistoryResult
+            switch historyResult {
+            case .success(let value): result = value
+            case .failure(let error):
+                guard let nowPlayingResult else { throw error }
+                plexErrorMessage = "History: " + error.localizedDescription
+                result = PlexHistoryResult(items: [], serverBaseURL: nowPlayingResult.serverBaseURL,
+                                           serverToken: nowPlayingResult.serverToken)
+            }
+            if case .failure(let error) = playingResult {
+                plexErrorMessage = "Now Playing: " + error.localizedDescription
+            }
             let historyAccountIDs = Set(result.items.compactMap { $0.accountID ?? $0.userID })
             let nowPlayingAccountIDs = Set((nowPlayingResult?.items ?? []).compactMap { $0.accountID ?? $0.userID })
             let candidateAccountIDs = historyAccountIDs.union(nowPlayingAccountIDs)
@@ -864,6 +900,8 @@ final class HomeViewModel: ObservableObject {
                 preferredAccountIDs: preferredAccountIDs,
                 candidateAccountIDs: candidateAccountIDs
             )
+            try Task.checkCancellation()
+            guard generation == plexLoadGeneration else { return }
             let filteredItems = result.items.filter { item in
                 matchesPreferredAccount(item)
             }
@@ -913,8 +951,11 @@ final class HomeViewModel: ObservableObject {
                     duration: nil
                 )
             }
-            plexNowPlaying = nowPlayingPayload.items
-            plexRecent = recentMapped.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
+            if nowPlayingResult != nil { plexNowPlaying = nowPlayingPayload.items }
+            if case .success = historyResult {
+                plexRecent = recentMapped.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
+            }
+            plexLastLoaded = Date()
             plexTokenLoaded = token
             plexPreferredServerLoaded = preferredServerID
             plexPreferredAccountLoaded = preferredAccountIDs
@@ -928,20 +969,30 @@ final class HomeViewModel: ObservableObject {
             plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
 #endif
         } catch is CancellationError {
-            plexIsLoading = false
             return
         } catch let error as URLError where error.code == .cancelled {
-            plexIsLoading = false
             return
         } catch {
-            plexNowPlaying = []
-            plexRecent = []
-            print("Plex history error: \(error)")
-#if os(iOS)
-            plexLiveActivityManager.sync(nowPlaying: plexNowPlaying)
-#endif
+            guard generation == plexLoadGeneration else { return }
+            plexErrorMessage = error.localizedDescription
+            print("Plex history error: \(error.localizedDescription)")
         }
-        plexIsLoading = false
+    }
+
+    private func plexResult(_ operation: () async throws -> PlexHistoryResult) async -> Result<PlexHistoryResult, Error> {
+        do { return .success(try await operation()) }
+        catch { return .failure(error) }
+    }
+
+    private func clearPlexResolutionCache() {
+        plexPrefetchTask?.cancel()
+        plexNowPlayingArtworkTask?.cancel()
+        plexRouteCache = [:]
+        plexShowIDCache = [:]
+        plexPrefetchedKeys = []
+        plexTMDBPosterCache = [:]
+        plexTMDBPosterFailures = []
+        plexLastLoaded = nil
     }
 
     func refreshPlexNowPlaying(
@@ -949,6 +1000,8 @@ final class HomeViewModel: ObservableObject {
         preferredServerID: String?,
         preferredAccountIDs: Set<Int>
     ) async {
+        guard !plexIsLoading else { return }
+        let generation = plexLoadGeneration
         guard let token, !token.isEmpty else {
             plexNowPlaying = []
             plexNowPlayingArtworkTask?.cancel()
@@ -961,7 +1014,7 @@ final class HomeViewModel: ObservableObject {
         if plexTokenLoaded != token
             || plexPreferredServerLoaded != preferredServerID
             || plexPreferredAccountLoaded != preferredAccountIDs
-            || plexRecent.isEmpty {
+            || plexLastLoaded.map({ Date().timeIntervalSince($0) > 60 }) != false {
             await loadPlexHistory(
                 token: token,
                 preferredServerID: preferredServerID,
@@ -995,6 +1048,8 @@ final class HomeViewModel: ObservableObject {
                 serverBaseURL: nowPlayingResult.serverBaseURL,
                 serverToken: nowPlayingResult.serverToken
             )
+            try Task.checkCancellation()
+            guard generation == plexLoadGeneration else { return }
             plexNowPlaying = nowPlayingPayload.items
             plexRecent = plexRecent.filter { !nowPlayingPayload.sourceIDs.contains($0.id) }
             startPlexNowPlayingArtworkResolution(

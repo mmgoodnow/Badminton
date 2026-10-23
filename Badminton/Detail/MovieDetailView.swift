@@ -232,8 +232,7 @@ struct MovieDetailView: View {
                 Button(plexButtonTitle) {
                     Task {
                         await overseerrRequest.request(
-                            baseURL: overseerrAuthManager.baseURL,
-                            cookie: overseerrAuthManager.authCookie()
+                            authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
                         )
                         if overseerrRequest.needsAuthenticationReconnect {
                             overseerrAuthManager.expireSession()
@@ -344,8 +343,7 @@ struct MovieDetailView: View {
 
     private func refreshOverseerr() async {
         await overseerrRequest.load(
-            baseURL: overseerrAuthManager.baseURL,
-            cookie: overseerrAuthManager.authCookie()
+            authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
         )
         if overseerrRequest.needsAuthenticationReconnect {
             overseerrAuthManager.expireSession()

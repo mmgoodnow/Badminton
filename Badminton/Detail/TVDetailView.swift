@@ -461,8 +461,7 @@ struct TVDetailView: View {
                                 : nil
                             await overseerrRequest.request(
                                 seasons: seasonsToRequest,
-                                baseURL: overseerrAuthManager.baseURL,
-                                cookie: overseerrAuthManager.authCookie()
+                                authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
                             )
                             if overseerrRequest.needsAuthenticationReconnect {
                                 overseerrAuthManager.expireSession()
@@ -499,8 +498,7 @@ struct TVDetailView: View {
 
     private func refreshOverseerr() async {
         await overseerrRequest.load(
-            baseURL: overseerrAuthManager.baseURL,
-            cookie: overseerrAuthManager.authCookie()
+            authManager: overseerrAuthManager, plexToken: plexAuthManager.authToken
         )
         if overseerrRequest.needsAuthenticationReconnect {
             overseerrAuthManager.expireSession()
