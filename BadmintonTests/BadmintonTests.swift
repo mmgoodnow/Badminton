@@ -168,6 +168,7 @@ struct BadmintonTests {
         await model.loadPlexHistory(token: "account", preferredServerID: "selected", preferredAccountIDs: [], force: true)
         #expect(model.plexNowPlaying.count == 1)
         #expect(model.plexErrorMessage != nil)
+        #expect(model.plexRecoveryAction == .retry)
         await model.loadPlexHistory(token: nil, preferredServerID: nil, preferredAccountIDs: [])
         session.invalidateAndCancel()
     }
@@ -199,6 +200,27 @@ struct BadmintonTests {
         #expect(responses.0.mediaInfo?.status == .available)
         #expect(responses.1.mediaInfo?.status == .available)
         #expect(logins == 1)
+        session.invalidateAndCancel()
+    }
+
+    @Test func rejectedPlexTokenOffersReconnectInsteadOfRetry() async throws {
+        let session = session { _ in (401, [:], "Unauthorized") }
+        let model = HomeViewModel(plexClient: PlexAPIClient(session: session))
+        await model.loadPlexHistory(token: "expired", preferredServerID: "selected", preferredAccountIDs: [])
+        #expect(model.plexRecoveryAction == .reconnect)
+        #expect(model.plexRecoveryAction.title == "Reconnect Plex")
+        #expect(!model.plexIsLoading)
+        session.invalidateAndCancel()
+    }
+
+    @Test func absentPlexSelectionOffersServerSettings() async throws {
+        let session = session { _ in
+            Issue.record("No server read is allowed without a selection")
+            return (200, [:], "[]")
+        }
+        let model = HomeViewModel(plexClient: PlexAPIClient(session: session))
+        await model.loadPlexHistory(token: "valid", preferredServerID: nil, preferredAccountIDs: [])
+        #expect(model.plexRecoveryAction == .settings)
         session.invalidateAndCancel()
     }
 

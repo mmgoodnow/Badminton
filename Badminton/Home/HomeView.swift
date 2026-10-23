@@ -232,14 +232,29 @@ struct HomeView: View {
 
                 if let error = viewModel.plexErrorMessage {
                     HStack {
-                        Text(error).font(.callout).foregroundStyle(.secondary)
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadPlexHistory(token: plexAuthManager.authToken,
-                                    preferredServerID: plexAuthManager.preferredServerID,
-                                    preferredAccountIDs: plexAuthManager.preferredAccountIDs, force: true)
+                        Text(plexAuthManager.errorMessage ?? error).font(.callout).foregroundStyle(.secondary)
+                        Button(plexAuthManager.isAuthenticating ? "Reconnecting…" :
+                               viewModel.plexIsLoading ? "Retrying…" : viewModel.plexRecoveryAction.title) {
+                            switch viewModel.plexRecoveryAction {
+                            case .reconnect:
+                                Task {
+                                    await plexAuthManager.signIn()
+                                    guard plexAuthManager.errorMessage == nil else { return }
+                                    await viewModel.loadPlexHistory(token: plexAuthManager.authToken,
+                                        preferredServerID: plexAuthManager.preferredServerID,
+                                        preferredAccountIDs: plexAuthManager.preferredAccountIDs, force: true)
+                                }
+                            case .settings:
+                                showingSettings = true
+                            case .retry:
+                                Task {
+                                    await viewModel.loadPlexHistory(token: plexAuthManager.authToken,
+                                        preferredServerID: plexAuthManager.preferredServerID,
+                                        preferredAccountIDs: plexAuthManager.preferredAccountIDs, force: true)
+                                }
                             }
                         }
+                        .disabled(viewModel.plexIsLoading || plexAuthManager.isAuthenticating)
                     }
                 }
                 if viewModel.plexIsLoading && !hasItems {
@@ -724,6 +739,20 @@ private struct PlexLoadIdentity: Hashable {
     let accountIDs: Set<Int>
 }
 
+enum PlexRecoveryAction {
+    case retry
+    case reconnect
+    case settings
+
+    var title: String {
+        switch self {
+        case .retry: return "Retry"
+        case .reconnect: return "Reconnect Plex"
+        case .settings: return "Choose Server"
+        }
+    }
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published var trendingMovies: [TMDBMovieSummary] = []
@@ -735,6 +764,7 @@ final class HomeViewModel: ObservableObject {
     @Published var popularPeople: [TMDBPersonSummary] = []
     @Published var plexNowPlaying: [PlexRecentlyWatchedItem] = []
     @Published var plexRecent: [PlexRecentlyWatchedItem] = []
+    @Published private(set) var plexRecoveryAction: PlexRecoveryAction = .retry
     @Published var plexErrorMessage: String?
     private var plexLoadGeneration = UUID()
     private var plexLastLoaded: Date?
@@ -861,7 +891,6 @@ final class HomeViewModel: ObservableObject {
             plexNowPlaying = []
         }
         plexIsLoading = true
-        plexErrorMessage = nil
         defer { if generation == plexLoadGeneration { plexIsLoading = false } }
         do {
             async let history = plexResult { try await self.plexClient.fetchRecentlyWatched(
@@ -871,18 +900,20 @@ final class HomeViewModel: ObservableObject {
             let (historyResult, playingResult) = await (history, playing)
             try Task.checkCancellation()
             guard generation == plexLoadGeneration else { return }
+            plexErrorMessage = nil
+            plexRecoveryAction = .retry
             let nowPlayingResult = try? playingResult.get()
             let result: PlexHistoryResult
             switch historyResult {
             case .success(let value): result = value
             case .failure(let error):
                 guard let nowPlayingResult else { throw error }
-                plexErrorMessage = "History: " + error.localizedDescription
+                showPlexError(error, prefix: "History: ")
                 result = PlexHistoryResult(items: [], serverBaseURL: nowPlayingResult.serverBaseURL,
                                            serverToken: nowPlayingResult.serverToken)
             }
             if case .failure(let error) = playingResult {
-                plexErrorMessage = "Now Playing: " + error.localizedDescription
+                showPlexError(error, prefix: "Now Playing: ")
             }
             let historyAccountIDs = Set(result.items.compactMap { $0.accountID ?? $0.userID })
             let nowPlayingAccountIDs = Set((nowPlayingResult?.items ?? []).compactMap { $0.accountID ?? $0.userID })
@@ -966,8 +997,17 @@ final class HomeViewModel: ObservableObject {
             return
         } catch {
             guard generation == plexLoadGeneration else { return }
-            plexErrorMessage = error.localizedDescription
+            showPlexError(error)
             print("Plex history error: \(error.localizedDescription)")
+        }
+    }
+
+    private func showPlexError(_ error: Error, prefix: String = "") {
+        plexErrorMessage = prefix + error.localizedDescription
+        switch error as? PlexAPIError {
+        case .authenticationRequired: plexRecoveryAction = .reconnect
+        case .noSelectedServer: plexRecoveryAction = .settings
+        default: plexRecoveryAction = .retry
         }
     }
 

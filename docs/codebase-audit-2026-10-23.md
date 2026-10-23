@@ -12,7 +12,7 @@ Read-only live checks with the Mac app's saved credentials reproduced:
 
 The existing Seerr session is invalid. Plex's saved token is also unauthorized; the user must reconnect Plex before live server access or Plex-based Seerr session renewal can succeed. No live media requests were submitted. No other Plex server was queried. Credentials were kept out of diagnostics.
 
-The rebuilt Mac app was inspected through accessibility: the top rail visibly reports `Reconnect Plex in Settings; its saved connection is no longer authorized.` and exposes Retry, while TMDB content remains visible.
+The rebuilt Mac app was inspected through accessibility: the top rail visibly reports `Reconnect Plex in Settings; its saved connection is no longer authorized.` and initially exposed Retry, while TMDB content remains visible.
 
 ## Fixed in this pass
 
@@ -23,7 +23,7 @@ The rebuilt Mac app was inspected through accessibility: the top rail visibly re
 | Every Plex history, session, and prefetched metadata request repeated cloud discovery. A single chosen remote address could fail without fallback. | Shares discovery for five minutes within the client, races actual reads across advertised addresses of the selected server, and reuses the working address. Connection reads have a six-second timeout. | `Plex/PlexAPIClient.swift` |
 | Missing preferred server silently selected a different server. | An absent, unselected, or unreachable server produces an error. All history, sessions, and metadata reads require the Preferences server identifier. Alternative addresses always belong to that identifier. | `Plex/PlexAPIClient.swift` |
 | Three startup tasks could load the Plex rail concurrently; history preceded playback, and manual refresh waited for TMDB first. | One combined Plex task identity; concurrent history/playback and manual-refresh sources; generation checks prevent stale rail results overwriting new preferences. | `Home/HomeView.swift` |
-| History failure hid playback; refresh failure erased the rail and only printed diagnostics. | History and playback can succeed independently. Failed refreshes preserve previous items and expose an error with Retry. Plex 401/403 discovery errors explain that reconnection is needed. | `Home/HomeView.swift` |
+| History failure hid playback; refresh failure erased the rail and only printed diagnostics. | History and playback can succeed independently. Failed refreshes preserve previous items. Transport failures offer Retry with progress, invalid credentials offer Reconnect Plex directly, and an absent server selection opens Settings. | `Home/HomeView.swift` |
 | An expired Plex token required disconnecting before sign-in, which cleared the server selection. | Settings now offers Reconnect Plex while signed in, preserving the server and account filters. | `Settings/SettingsView.swift` |
 | Plex navigation/artwork caches were keyed by ratingKey without server identity. | Clears resolution caches and cancels background work when token/server/account scope changes or Plex disconnects. | `Home/HomeView.swift` |
 | Seerr availability used bare numeric TMDB IDs, mixing movie and TV namespaces; the cache survived server changes and disconnects. | Uses `(mediaType, tmdbID)` keys and scopes persisted snapshots to a hash of server/session. Disconnect clears published availability; stale responses cannot publish into a new scope. Library reads use the same session recovery. | `Overseerr/OverseerrLibraryIndex.swift` and badge callers |
@@ -64,7 +64,7 @@ The prior unit test was an empty example; the prior UI suite only launches the a
 
 ## Validation
 
-- The complete Mac acceptance command passed: nine networking regression tests and four UI test runs. Mac app builds and typechecks through Xcode's normal test build, using existing signing and deployment settings.
-- Regression tests cover session renewal/retry, simultaneous renewal, genuine permission denial, non-JSON 401, selected-server isolation, connection fallback, discovery reuse, missing selected server, independent playback/history, stale-rail preservation, and movie/TV availability separation plus disconnect cleanup.
+- The complete Mac acceptance command passed: eleven networking regression tests and four UI test runs. Mac app builds and typechecks through Xcode's normal test build, using existing signing and deployment settings.
+- Regression tests cover session renewal/retry, simultaneous renewal, genuine permission denial, non-JSON 401, selected-server isolation, connection fallback, discovery reuse, missing selected server, independent playback/history, stale-rail preservation, and movie/TV availability separation plus disconnect cleanup, and authentication-aware rail recovery actions.
 - Mac app restarted after builds; the visible invalid-Plex-token state was checked. The final built app was copied to `/Applications/Badminton.app` and relaunched.
 - Existing compiler concurrency warnings remain; authenticated live Plex timing, live Seerr request submission, and iOS/device behavior remain unverified.
